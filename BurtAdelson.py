@@ -12,11 +12,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from math import floor, exp
 from random import sample
-import warnings
 
-#%%
-# Ignorar warning de plt
-warnings.filterwarnings("ignore",".*GUI is implemented.*")
 
 ########################################
 ###   FUNCIONES DE OTRAS PRÁCTICAS   ###
@@ -94,37 +90,6 @@ def pintaI(image, flag_color=1, image_title = "Imagen", window_title = "Ejercici
 ####################
 ###   PROYECTO   ###
 ####################
-
-def representar(lista_nombres, lista_imagenes, una_imagen, color):
-    plt.clf() # Limpiamos el plot, si es que hay algo en el
-
-    if una_imagen:  # Si es una imagen, ocupamos el plot entero
-        plt.subplot(1,1,1)
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        if color:
-            plt.imshow(cv2.cvtColor(lista_imagenes, cv2.COLOR_BGR2RGB))
-        else:
-            plt.imshow(lista_imagenes, cmap = 'gray', interpolation = 'bicubic')
-        plt.title(lista_nombres) # Cogemos el nombre e imagen de las listas
-    else:   # Si hay mas de una imagen
-        for i in range(0, len(lista_nombres)):  # Recorremos las listas
-            img = lista_imagenes[i] # Cogemos la siguiente imagen
-            if len(lista_nombres) > 3:  # Dividimos el plot
-                plt.subplot(len(lista_nombres)/2 +1,len(lista_nombres)/2, i+1)
-            else:   # Hacemos mas divisiones si hay mas de 3 imagenes
-                plt.subplot(len(lista_nombres)/2 +1,len(lista_nombres)/2 + 1, i+1)
-            plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-            if color:
-                plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-            else:
-                plt.imshow(img, cmap = 'gray', interpolation = 'bicubic')
-            plt.title(lista_nombres[i])
-
-    plt.show() # Mostramos el plot
-     # Realizamos un punto de ruptura para visualizar hasta que se pulse
-             # una tecla cualquiera
-
-#%%
 
 # Funcion que implementa una proyeccion cilindrica sobre una imagen,
 # dada una distancia focal f y un factor de escalado s
@@ -208,7 +173,15 @@ def ProyeccionEsferica(imagen, f, s):
 
     return imagen_proyectada
 
-#%%
+def listaProyeccionesEsfericas(list, f, s, title):
+    proy = []
+
+    print("Calculando las proyecciones esféricas de '" + title + "'")
+    for i in range(len(list)):
+        proy.append(ProyeccionEsferica(list[i], f, s))
+
+    return proy
+
 
 def correspondencias(imagen1, imagen2, criterio, elementos):
     # Creamos el detector-descriptor SIFT
