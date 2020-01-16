@@ -273,8 +273,11 @@ def laplacian_pyramid(image, levels = 4, border_type = cv2.BORDER_DEFAULT):
     lap_pyr.append(gau_pyr[levels])
     return lap_pyr
 
-# Funciones que dado un sigma genera una máscara Gaussiana
-def Mascara_Gaussiana(x,sigma):
+""" Máscara gaussiana.
+- x:
+- sigma:
+"""
+def Mascara_Gaussiana(x, sigma):
     # Mascara gaussiana
     return exp(-((x*x)/(2*(sigma*sigma))))
 
@@ -575,7 +578,13 @@ def ProyeccionCilindrica(img, f, s):
 
     return proyected
 
-def listaProyeccionesCilindricas(list, f, s, title):
+""" Dada una lista de imágenes devuelve otra con las proyecciones cilíndricas.
+- list: lista de imágenes a proyectar.
+- f: distancia focal.
+- s: factor de escalado.
+- title (op): título. Por defecto "Imagen".
+"""
+def listaProyeccionesCilindricas(list, f, s, title="Imagen"):
     proy = []
 
     print("Calculando las proyecciones cilíndricas de '" + title + "'")
@@ -613,7 +622,13 @@ def ProyeccionEsferica(img, f, s):
 
     return proyected
 
-def listaProyeccionesEsfericas(list, f, s, title):
+""" Dada una lista de imágenes devuelve otra con las proyecciones esféricas.
+- list: lista de imágenes a proyectar.
+- f: distancia focal.
+- s: factor de escalado.
+- title (op): título. Por defecto "Imagen".
+"""
+def listaProyeccionesEsfericas(list, f, s, title="Imagen"):
     proy = []
 
     print("Calculando las proyecciones esféricas de '" + title + "'")
@@ -622,7 +637,10 @@ def listaProyeccionesEsfericas(list, f, s, title):
 
     return proy
 
-# Funcion que ajusta las imagenes al mismo tamaño y al formato uint32
+""" Ajusta las imagenes al mismo tamaño (devuelve formato uint32).
+- img1: primera imagen a ajustar.
+- img2: segunda imagen a ajustar.
+"""
 def AjustarImagenes(img1, img2):
     # Obtenemos las dimensiones de las imágenes
     y1, x1 = img1.shape[0:2]
@@ -658,6 +676,11 @@ def AjustarImagenes(img1, img2):
 
     return new_img1, new_img2
 
+""" Para cada nivel de la Laplaciana mezcla la primera mitad de la imagen
+de la primera pirámide con la segunda de la segunda imagen.
+- Laplaciana1: primera pirámide a mezclar.
+- Laplaciana2: segunda pirámide a mezclar.
+"""
 def Mezcla(Laplaciana1, Laplaciana2):
     Laplaciana_final = []
     for i in range(len(Laplaciana1)):
@@ -672,6 +695,10 @@ def Mezcla(Laplaciana1, Laplaciana2):
         Laplaciana_final.append(nivel)
     return Laplaciana_final
 
+""" Limpia el área que no está en ninguna imagen.
+- img1: primera imagen a tratar.
+- img2: segunda imagen a tratar.
+"""
 def limpiarImagen(img1, img2):
     mask = np.zeros((img1.shape[0], img1.shape[1]))
     mask[np.nonzero(img1)[0:2]] = 1
@@ -698,23 +725,10 @@ def limpiarImagen(img1, img2):
 
     return img1, img2
 
-def BurtAdelson(img1, img2):
-    # Ajustamos las imágenes a formato uint32 y al mismo tamaño
-    img1, img2 = AjustarImagenes(img1, img2)
-    # Calculamos las pirámides Laplacianas
-    laplaciana1 = PiramideLaplaciana(img1)
-    laplaciana2 = PiramideLaplaciana(img2)
-
-    # Calculamos la pirámide Laplaciana combinada
-    laplaciana_mezcla = Mezcla(laplaciana1, laplaciana2)
-    img_restaurada = RestaurarLaplaciana(laplaciana_mezcla)
-
-    # Normalizamos los valores que salgan del rango [0,255]
-    np.clip(img_restaurada, 0, 255, out=img_restaurada)
-    # Transformamos el formato de la imagen para la visualización
-    img_restaurada = np.uint8(img_restaurada)
-    return img_restaurada
-
+""" Aplica el algoritmo Burt Adelson a dos imágenes
+- img1: primera imagen a tratar.
+- img2: segunda imagen a tratar.
+"""
 def BurtAdelson(img1, img2):
     res1, res2 = getMosaic(img1, img2)              # Calulamos el mosaico
     res1, res2 = limpiarImagen(res1, res2)          # Limpiamos las imágenes
@@ -727,6 +741,9 @@ def BurtAdelson(img1, img2):
     img_splined = np.uint8(img_splined)             # Formato uint8 para visualización
     return img_splined
 
+""" Aplica el algoritmo Burt Adelson a dos imágenes
+- img_list: lista de imágenes a tratar.
+"""
 def BurtAdelson_N(img_list):
     centro = len(img_list)//2
     right = BurtAdelson(img_list[centro], img_list[centro+1])
@@ -760,10 +777,13 @@ if __name__ == "__main__":
              leer_imagen("imagenes/alham2.png", 1),
              leer_imagen("imagenes/alham3.png", 1),
              leer_imagen("imagenes/alham4.png", 1)]
-    
-    #yosProy = listaProyeccionesCilindricas(yos, 800, 800, "Yosemite")
-    alProy = listaProyeccionesCilindricas(al, 800, 800, "Alhambra 1")
-    #alhamProy = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
+
+    #yosProyCil = listaProyeccionesCilindricas(yos, 800, 800, "Yosemite")
+    alProyCil = listaProyeccionesCilindricas(al, 800, 800, "Alhambra 1")
+    #alhamProyCil = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
+    #yosProyEsf = listaProyeccionesEsfericas(yos, 800, 800, "Yosemite")
+    #alProyEsf = listaProyeccionesEsfericas(al, 800, 800, "Alhambra 1")
+    #alhamProyEsf = listaProyeccionesEsfericas
 
     # Ejemplo para probar proyecciones cilíndricas
     #proyeccion_cilindrica = ProyeccionCilindrica(al1, 600, 600)
@@ -776,17 +796,23 @@ if __name__ == "__main__":
     #input("Pulsa 'Enter' para continuar\n")
 
     # Ejemplo para probar un mosaico de yosemite
-    #yosPan = BurtAdelson_N(yosProy)
-    #pintaI(yosPan, 1, "Mosaico de Yosemite.", "VC Proyecto - BurtAdelson")
+    #yosPanCil = BurtAdelson_N(yosProyCil)
+    #yosPanEsf = BurtAdelson_N(yosProyEsf)
+    #pintaI(yosPanCil, 1, "Mosaico de Yosemite (cilíndrica).", "VC Proyecto - BurtAdelson")
+    #pintaI(yosPanEsf, 1, "Mosaico de Yosemite (esférica).", "VC Proyecto - BurtAdelson")
     #input("Pulsa 'Enter' para continuar\n")
 
     # Ejemplo para probar un mosaico de la alhambra
-    alPan = BurtAdelson_N(alProy)
-    pintaI(alPan, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
+    alPanCil = BurtAdelson_N(alProyCil)
+    #alPanEsf = BurtAdelson_N(alProyEsf)
+    pintaI(alPanCil, 1, "Mosaico de la Alhambra (cilíndrica).", "VC Proyecto - BurtAdelson")
+    #pintaI(alPanEsf, 1, "Mosaico de la Alhambra (esférica).", "VC Proyecto - BurtAdelson")
 
     # Ejemplo para probar un mosaico de la alhambra 2
-    #alhamPan = BurtAdelson_N(alhamProy)
-    #pintaI(alhamPan, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
+    #alhamPanCil = BurtAdelson_N(alhamProyCil)
+    #alhamPanEsf = BurtAdelson_N(alhamProyEsf)
+    #pintaI(alhamPanCil, 1, "Mosaico de la Alhambra (cilíndrica).", "VC Proyecto - BurtAdelson")
+    #pintaI(alhamPanEsf, 1, "Mosaico de la Alhambra (esférica).", "VC Proyecto - BurtAdelson")
     """
     pyramid = laplacian_pyramid(al[0], 4)
     res1 = RestaurarLaplaciana_nuevo(pyramid)
