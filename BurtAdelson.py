@@ -14,9 +14,9 @@ from math import floor, exp
 from random import sample
 import warnings
 
-########################################
-###   FUNCIONES DE OTRAS PRÁCTICAS   ###
-########################################
+###########################################
+###   LECTURA E IMPRESIÓN DE IMÁGENES   ###
+###########################################
 
 """ Lee una imagen ya sea en grises o en color. Devuelve la imagen.
 - file_name: archivo de la imagen.
@@ -83,26 +83,9 @@ def pintaI(image, flag_color=1, image_title = "Imagen", window_title = "Ejercici
     plt.show()
     image = image.astype(np.float64)    # Devolvemos su formato
 
-    #cv2.imshow(image_title, image)
-    #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
-
-""" Visualiza varias imágenes a la vez.
-- image_list: Secuencia de imágenes.
-- flag_color (op): bandera para indicar si la imagen es en B/N o color. Por defecto color.
-- image_title (op): título de la imagen. Por defecto 'Imágenes'
-- window_title (op): título de la ventana. Por defecto 'Ejercicio pirámide'
-"""
-def muestraMI(image_list, flag_color = 1, image_title = "Imágenes", window_title = "Ejercicio pirámide"):
-  altura = max(im.shape[0] for im in image_list)
-
-  for i,im in enumerate(image_list):
-    if im.shape[0] < altura: # Redimensionar imágenes
-      borde = int((altura - image_list[i].shape[0])/2)
-      image_list[i] = cv2.copyMakeBorder(image_list[i], borde, borde + (altura - image_list[i].shape[0]) % 2, 0, 0, cv2.BORDER_CONSTANT, value = (0,0,0))
-
-  im_concat = cv2.hconcat(image_list)
-  pintaI(im_concat, flag_color, image_title, "Ejercicio pirámide")
+###############################
+###   FILTROS Y PIRÁMIDES   ###
+###############################
 
 """ Aplica una máscara Gaussiana 2D. Devuelve la imagen con las máscara aplicada.
 - image: la imagen a tratar.
@@ -287,7 +270,146 @@ def laplacian_pyramid(image, levels = 4, border_type = cv2.BORDER_DEFAULT):
         #gau_n_1 = 4*gaussian_blur(gau_n_1, 1, 1, 7, 7)   # Otra opción para la laplaciana: poniendo 0s.
         gau_n_1 = gaussian_blur(gau_n_1, 1, 1, 7, 7, border_type = border_type)
         lap_pyr.append(normaliza(gau_pyr[n] - gau_n_1, "Etapa {} de la pirámide gaussiana.".format(n)))
+    lap_pyr.append(gau_pyr[levels])
     return lap_pyr
+
+# Funciones que dado un sigma genera una máscara Gaussiana
+def Mascara_Gaussiana(x,sigma):
+    # Mascara gaussiana
+    return exp(-((x*x)/(2*(sigma*sigma))))
+
+def Gaussiana(sigma):
+
+    # Definimos un array de valores desde -3sigma hasta 3sigma+1
+    mascara = np.arange(-floor(3*sigma), floor(3*sigma+1))
+
+    # Calculamos la funcion para cada valor del vector
+    vector = []
+    for i in mascara:
+        vector.append([Mascara_Gaussiana(i,sigma)])
+
+    # Lo transformamos en un array
+    mascara = np.array(vector)
+
+    # Dividimos cada elemento de la mascara por la media de todos ellos
+    mascara = np.divide(mascara, np.sum(mascara))
+    return mascara
+
+# Función que dada una imagen y una matriz con un tamaño, sobremuestrea la imagen
+# al tamaño de la matriz y aplica una convolución con kernel gaussiano sobre
+# la misma
+def convolucionSeparable(img, tam, kernel_gaussiano):
+    # Aumentamos el tamaño de la imagen al deseado
+    im_expanded = np.zeros(tam.shape, img.dtype)
+    im_expanded[::2, ::2, ...] = img
+
+    # Generamos el kernel a utilizar
+    if kernel_gaussiano:
+        mascara = Gaussiana(1)
+    else:
+        mascara = 1.0 / 10 * np.array([1, 5, 8, 5, 1])
+
+    copia = im_expanded # Realizo una copia de la imagen sobre la que trabajare
+
+    for c in range(2): # Una iteracion para filas, otra para columnas
+        aux = copia.copy() # Realizo una copia auxiliar
+        for i in range(copia.shape[0]): # Recorro las filas
+            # Aplico el filtro en las filas de la imagen, almacenandolo en
+            # la imagen auxiliar, con la mascara calculada anteriormente
+            # y el borde indicado
+            aux[i,:] = cv2.filter2D(src=copia[i,:],dst=aux[i,:],ddepth=cv2.CV_32F,kernel=mascara,borderType=cv2.BORDER_DEFAULT)
+        # Realizo la traspuesta para poder actuar en filas y columnas como si
+        # ambas fueran filas
+        copia = cv2.transpose(aux)
+
+    return copia
+
+# Funcion que realiza el proceso de pirámide Gaussiana
+def PiramideGaussiana(img, levels=8):
+    pyramid = [img] # imagen original
+    actual = img
+    for i in range(levels):
+        actual = np.uint8(actual)
+        # Convolucion + subsampling
+        actual = cv2.pyrDown(actual)
+        actual = np.uint32(actual)
+        # Guardamos la imagen
+        pyramid.append(actual)
+    return pyramid
+
+
+def PiramideLaplaciana(img, levels=8):
+    gaussiana = PiramideGaussiana(img, levels)
+    pyramid = []
+    for i in range(len(gaussiana) - 1):
+        actual = gaussiana[i]
+        siguiente = gaussiana[i+1]
+        # Upsampling
+        siguiente = np.float32(siguiente)
+        aumento = convolucionSeparable(siguiente, actual, False)
+        siguiente = np.uint32(siguiente)
+
+        # Hacemos la diferencia
+        pyramid.append(actual - aumento)
+
+    # Ultimo nivel de la gaussiana que es el primer nivel de la laplaciana
+    pyramid.append(gaussiana[-1])
+    #for i in range(len(pyramid)):
+        #pintaI(pyramid[i])
+    return pyramid
+
+def PiramideLaplaciana_nuevo(img, levels=8):
+    gaussiana = PiramideGaussiana(img, levels)
+    pyramid = []
+    for i in range(len(gaussiana) - 1):
+        actual = gaussiana[i]
+        siguiente = gaussiana[i+1]
+
+        siguiente = np.uint8(siguiente)
+        siguiente = cv2.pyrUp(siguiente, dstsize=(actual.shape[1],actual.shape[0]))
+        siguiente = np.uint32(siguiente)
+
+        # Hacemos la diferencia
+        pyramid.append(actual - siguiente)
+
+    # Ultimo nivel de la gaussiana que es el primer nivel de la laplaciana
+    #pyramid.append(gaussiana[-1])
+    #for i in range(len(pyramid)):
+        #pintaI(pyramid[i])
+    return pyramid
+
+def RestaurarLaplaciana(piramide):
+    # Cogemos el ultimo nivel de la laplaciana
+    recuperacion = piramide[-1]
+    # Recorremos todos los niveles
+    for i in range(len(piramide) - 1):
+        # Cogemos el siguiente
+        siguiente = piramide[-2 - i]
+        # Transformamos al formato adecuado para el upsample
+        recuperacion = np.float32(recuperacion)
+        # Realizamos la convolucion y aumento
+        aumento = convolucionSeparable(recuperacion, siguiente, False)
+        # Recuperamos el formato
+        recuperacion = np.uint32(recuperacion)
+        # Realizamos la suma y recuperamos la imagen
+        recuperacion = aumento + siguiente
+    # Guardamos la imagen en el formato uint32
+    recuperacion = np.uint32(recuperacion)
+    return recuperacion
+
+def RestaurarLaplaciana_nuevo(piramide):
+    # Cogemos el ultimo nivel de la laplaciana
+    recuperacion = piramide[-1]
+    for i in range(len(piramide) - 1):
+        siguiente = piramide[-2 - i]
+        # Realizamos la convolucion y aumento
+        aumento = cv2.pyrUp(recuperacion, dstsize=(siguiente.shape[1],siguiente.shape[0]))
+        recuperacion = aumento + siguiente
+    return recuperacion
+
+####################################
+###   CONSTRUCCIÓN DE MOSAICOS   ###
+####################################
 
 """ Dadas dos imágenes calcula los keypoints y descriptores para obtener los matches
 usando "BruteForce+crossCheck". Devuelve la imagen compuesta.
@@ -463,9 +585,9 @@ def getMosaicN(list):
 
     return res
 
-####################
-###   PROYECTO   ###
-####################
+########################
+###   BURT ADELSON   ###
+########################
 
 # Funcion que implementa una proyeccion cilindrica sobre una imagen,
 # dada una distancia focal f y un factor de escalado s
@@ -557,57 +679,6 @@ def listaProyeccionesEsfericas(list, f, s, title):
 
     return proy
 
-# Funciones que dado un sigma genera una máscara Gaussiana
-def Mascara_Gaussiana(x,sigma):
-    # Mascara gaussiana
-    return exp(-((x*x)/(2*(sigma*sigma))))
-
-def Gaussiana(sigma):
-
-    # Definimos un array de valores desde -3sigma hasta 3sigma+1
-    mascara = np.arange(-floor(3*sigma), floor(3*sigma+1))
-
-    # Calculamos la funcion para cada valor del vector
-    vector = []
-    for i in mascara:
-        vector.append([Mascara_Gaussiana(i,sigma)])
-
-    # Lo transformamos en un array
-    mascara = np.array(vector)
-
-    # Dividimos cada elemento de la mascara por la media de todos ellos
-    mascara = np.divide(mascara, np.sum(mascara))
-    return mascara
-
-# Función que dada una imagen y una matriz con un tamaño, sobremuestrea la imagen
-# al tamaño de la matriz y aplica una convolución con kernel gaussiano sobre
-# la misma
-def convolucionSeparable(img, tam, kernel_gaussiano):
-    # Aumentamos el tamaño de la imagen al deseado
-    im_expanded = np.zeros(tam.shape, img.dtype)
-    im_expanded[::2, ::2, ...] = img
-
-    # Generamos el kernel a utilizar
-    if kernel_gaussiano:
-        mascara = Gaussiana(1)
-    else:
-        mascara = 1.0 / 10 * np.array([1, 5, 8, 5, 1])
-
-    copia = im_expanded # Realizo una copia de la imagen sobre la que trabajare
-
-    for c in range(2): # Una iteracion para filas, otra para columnas
-        aux = copia.copy() # Realizo una copia auxiliar
-        for i in range(copia.shape[0]): # Recorro las filas
-            # Aplico el filtro en las filas de la imagen, almacenandolo en
-            # la imagen auxiliar, con la mascara calculada anteriormente
-            # y el borde indicado
-            aux[i,:] = cv2.filter2D(src=copia[i,:],dst=aux[i,:],ddepth=cv2.CV_32F,kernel=mascara,borderType=cv2.BORDER_DEFAULT)
-        # Realizo la traspuesta para poder actuar en filas y columnas como si
-        # ambas fueran filas
-        copia = cv2.transpose(aux)
-
-    return copia
-
 # Funcion que ajusta las imagenes al mismo tamaño y al formato uint32
 def AjustarImagenes(imagen1, imagen2):
     # Obtenemos las dimensiones de las imágenes
@@ -649,78 +720,15 @@ def AjustarTamImagenes(imagen1, imagen2, y_ajuste, x_ajuste):
 
     return (nuevas_imagenes[0], nuevas_imagenes[1])
 
-# Funcion que realiza el proceso de pirámide Gaussiana
-def PiramideGaussiana(imagen, niveles=8):
-    # Guardamos la imagen original
-    piramide = [imagen]
-    actual = imagen
-    # Recorremos las imágenes
-    for i in range(niveles):
-        # Establecemos el formato adecuado para OpenCV
-        actual = np.uint8(actual)
-        # Realizamos la convolucion y submuestreo
-        actual = cv2.pyrDown(actual)
-        # Recuperamos el formato
-        actual = np.uint32(actual)
-        # Guardamos la imagen
-        piramide.append(actual)
-    return piramide
-
-
-def PiramideLaplaciana(imagen, niveles=8):
-    gaussiana = PiramideGaussiana(imagen, niveles)
-    piramide = []
-    for i in range(len(gaussiana) - 1):
-        # Cogemos los operandos
-        actual = gaussiana[i]
-        siguiente = gaussiana[i + 1]
-        # Transformamos al formato adecuado para el upsample
-        siguiente = np.float32(siguiente)
-        # Realizamos la convolucion y aumento
-        aumento = convolucionSeparable(siguiente, actual, False)
-        # Recuperamos el formato
-        siguiente = np.uint32(siguiente)
-        # Realizamos la diferencia para obtener el nivel de la laplaciana
-        laplacian = actual - aumento
-        piramide.append(laplacian)
-
-    # Guardamos el ultimo nivel de la gaussiana que es el primer nivel
-    # de la laplaciana
-    piramide.append(gaussiana[-1])
-    return piramide
-
-
-def RestaurarLaplaciana(piramide):
-    # Cogemos el ultimo nivel de la laplaciana
-    recuperacion = piramide[-1]
-    # Recorremos todos los niveles
-    for i in range(len(piramide) - 1):
-        # Cogemos el siguiente
-        siguiente = piramide[-2 - i]
-        # Transformamos al formato adecuado para el upsample
-        recuperacion = np.float32(recuperacion)
-        # Realizamos la convolucion y aumento
-        aumento = convolucionSeparable(recuperacion, siguiente, False)
-        # Recuperamos el formato
-        recuperacion = np.uint32(recuperacion)
-        # Realizamos la suma y recuperamos la imagen
-        recuperacion = aumento + siguiente
-    # Guardamos la imagen en el formato uint32
-    recuperacion = np.uint32(recuperacion)
-    return recuperacion
-
-
 def Mezcla(Laplaciana1, Laplaciana2):
     Laplaciana_final = []
     for i in range(len(Laplaciana1)):
-        #left = Laplaciana1[i]
-        #right = Laplaciana2[i]
         nivel = np.zeros(Laplaciana1[i].shape, Laplaciana1[i].dtype)
         mitad = Laplaciana1[i].shape[1] // 2
         nivel[:, :mitad, ...] = Laplaciana1[i][:, :mitad, ...]
         nivel[:, -mitad:, ...] = Laplaciana2[i][:, -mitad:, ...]
         if Laplaciana1[i].shape[1] % 2 == 1:
-            # Numero impar de columnas
+            # Numero de columnas impar -> media aritmética
             nivel[:, mitad, ...] = (Laplaciana1[i][:, mitad, ...] + Laplaciana2[i][:, mitad, ...])/2
 
         Laplaciana_final.append(nivel)
@@ -762,21 +770,6 @@ def limpiarImagen(imagen, imagenBA1, imagenBA2):
 
     return imagen, imagenBA1, imagenBA2
 
-def mosaicoBA_MIO(imagen1, imagen2):
-    res1, res2 = getMosaic(imagen1, imagen2)
-
-    mascaraBA = np.zeros((res1.shape[0], res1.shape[1]))
-    mascaraBA[np.nonzero(res1)[0:2]] = 1
-    mascaraBA[np.nonzero(res2)[0:2]] = 2
-
-    mascaraBA, res1, res2 = limpiarImagen(mascaraBA, r32es1, res2)
-    mascaraBA[mascaraBA==1]=0
-    mascaraBA[mascaraBA==2]=1
-    # kuek
-    mosaico = BurtAdelson(res1, res2)
-
-    return mosaico
-
 def mosaicoBA(imagen1, imagen2):
     area1, area2 = getMosaic(imagen1, imagen2)
 
@@ -812,22 +805,6 @@ def mosaico_nBA(lista_imagenes):
 
     return mosaico_final
 
-def limpiarImagen1(imagen):
-    # Si la imagen es a colo creamos una copia en blanco y negro
-    if len(imagen.shape) == 3:
-        copia_imagen = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
-    else:
-        copia_imagen = imagen
-
-    # Calculamos las columnas enteras de 0
-    columnas = np.any(copia_imagen.T != 0,  axis = 1)
-    # Calculamos las filas enteras de 0
-    filas = np.any(copia_imagen.T != 0, axis = 0)
-
-    # Quitamos esas filas y columnas que sobran a la imagen
-    imagen = imagen[:,columnas][filas,:]
-
-    return imagen
 
 #######################
 ###       MAIN      ###
@@ -877,3 +854,10 @@ if __name__ == "__main__":
     # Ejemplo para probar un mosaico de la alhambra 2
     #alhamPan = mosaico_nBA(alhamProy)
     #pintaI(alhamPan, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
+    """
+    pyramid = laplacian_pyramid(al[0], 4)
+    res1 = RestaurarLaplaciana_nuevo(pyramid)
+    pintaI(res1)
+    res2 = RestaurarLaplaciana(pyramid)
+    pintaI(res2)
+    """
