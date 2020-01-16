@@ -515,8 +515,10 @@ def BurtAdelson(img1, img2, levels=6):
 """ Aplica el algoritmo Burt Adelson a dos imágenes
 - img_list: lista de imágenes a tratar.
 - levels (op): niveles de la pirámide laplaciana que se usa en el algoritmo. Por defecto 6.
+- title (op): título del conjunto de imágenes.
 """
-def BurtAdelson_N(img_list, levels=6):
+def BurtAdelson_N(img_list, levels=6, title="Imágenes"):
+    print("BurtAdelson al conjunto de imágenes " + title)
     centro = len(img_list)//2
     right = BurtAdelson(img_list[centro], img_list[centro+1], levels)
     left = BurtAdelson(img_list[centro-1], img_list[centro], levels)
@@ -552,41 +554,48 @@ if __name__ == "__main__":
 
     levels = 6      # Niveles para las pirámides en BurtAdelson
 
-    #yosProyCil = listaProyeccionesCilindricas(yos, 800, 800, "Yosemite")
+    yosProyCil = listaProyeccionesCilindricas(yos, 800, 800, "Yosemite")
     alProyCil = listaProyeccionesCilindricas(al, 800, 800, "Alhambra 1")
-    #alhamProyCil = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
-    #yosProyEsf = listaProyeccionesEsfericas(yos, 800, 800, "Yosemite")
-    #alProyEsf = listaProyeccionesEsfericas(al, 800, 800, "Alhambra 1")
-    #alhamProyEsf = listaProyeccionesEsfericas
+    alhamProyCil = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
+    yosProyEsf = listaProyeccionesEsfericas(yos, 800, 800, "Yosemite")
+    alProyEsf = listaProyeccionesEsfericas(al, 800, 800, "Alhambra 1")
+    alhamProyEsf = listaProyeccionesEsfericas(alham, 900, 900, "Alhambra 2")
 
+    print("\n----------   PROBANDO PROYECCIONES   ----------")
     # Ejemplo para probar proyecciones cilíndricas
-    #proyeccion_cilindrica = ProyeccionCilindrica(al1, 600, 600)
-    #pintaI(proyeccion_cilindrica, 1, "Proyeccion cilindrica. f=600. s=600.", "VC Proyecto - BurtAdelson")
-    #input("Pulsa 'Enter' para continuar\n")
+    proy_cilindrica = ProyeccionCilindrica(al[1], 600, 600)
+    pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=600. s=600.", "VC Proyecto - BurtAdelson")
+    proy_cilindrica = ProyeccionCilindrica(al[1], 800, 800)
+    pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=800. s=800.", "VC Proyecto - BurtAdelson")
 
     # Ejemplo para probar proyecciones esféricas
-    #proyeccion_esferica = ProyeccionEsferica(al1, 600, 600)
-    #pintaI(proyeccion_esferica, 1, "Proyeccion esférica. f=600. s=600.", "VC Proyecto - BurtAdelson")
-    #input("Pulsa 'Enter' para continuar\n")
+    proy_esferica = ProyeccionEsferica(al[1], 600, 600)
+    pintaI(proy_esferica, 1, "Proyeccion esférica. f=600. s=600.", "VC Proyecto - BurtAdelson")
+    proy_esferica = ProyeccionEsferica(al[1], 800, 800)
+    pintaI(proy_esferica, 1, "Proyeccion esférica. f=800. s=800.", "VC Proyecto - BurtAdelson")
 
+    input("Pulsa 'Enter' para continuar\n")
+
+    print("\n----------   PROBANDO BURTADELSON   ----------")
     # Ejemplo para probar un mosaico de yosemite
-    #yosPanCil = BurtAdelson_N(yosProyCil, levels)
-    #yosPanEsf = BurtAdelson_N(yosProyEsf, levels)
-    #pintaI(yosPanCil, 1, "Mosaico de Yosemite (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
-    #pintaI(yosPanEsf, 1, "Mosaico de Yosemite (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
-    #input("Pulsa 'Enter' para continuar\n")
+    yosPanCil = BurtAdelson_N(yosProyCil, levels, "Yosemite (cilíndrica - {} niveles)".format(levels))
+    yosPanEsf = BurtAdelson_N(yosProyEsf, levels, "Yosemite (esférica - {} niveles)".format(levels))
+    pintaI(yosPanCil, 1, "Mosaico de Yosemite (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
+    pintaI(yosPanEsf, 1, "Mosaico de Yosemite (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
 
     # Ejemplo para probar un mosaico de la alhambra
-    alPanCil = BurtAdelson_N(alProyCil, levels)
-    #alPanEsf = BurtAdelson_N(alProyEsf, levels)
+    alPanCil = BurtAdelson_N(alProyCil, levels, "Alhambra (cilíndrica - {} niveles)".format(levels))
+    alPanEsf = BurtAdelson_N(alProyEsf, levels, "Alhambra (esférica - {} niveles)".format(levels))
     pintaI(alPanCil, 1, "Mosaico de la Alhambra (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
-    #pintaI(alPanEsf, 1, "Mosaico de la Alhambra (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
+    pintaI(alPanEsf, 1, "Mosaico de la Alhambra (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
 
     # Ejemplo para probar un mosaico de la alhambra 2
-    #alhamPanCil = BurtAdelson_N(alhamProyCil, levels)
-    #alhamPanEsf = BurtAdelson_N(alhamProyEsf, levels)
-    #pintaI(alhamPanCil, 1, "Mosaico de la Alhambra (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
-    #pintaI(alhamPanEsf, 1, "Mosaico de la Alhambra (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
+    alhamPanCil = BurtAdelson_N(alhamProyCil, levels, "Alhambra (cilíndrica - {} niveles)".format(levels))
+    alhamPanEsf = BurtAdelson_N(alhamProyEsf, levels, "Alhambra (esférica - {} niveles)".format(levels))
+    pintaI(alhamPanCil, 1, "Mosaico de la Alhambra (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
+    pintaI(alhamPanEsf, 1, "Mosaico de la Alhambra (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
+
+    input("Pulsa 'Enter' para continuar\n")
     """
     pyramid = laplacian_pyramid(al[0], 4)
     res1 = LaplacianRestoring_nuevo(pyramid)
