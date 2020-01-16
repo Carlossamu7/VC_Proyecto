@@ -542,88 +542,38 @@ def getMosaic(img1, img2):
 
     return res1, res2
 
-""" Calcula la homografia que lleva la imagen al centro del mosaico.
-- img: Imagen
-- mosaicWidth: ancho del mosaico.
-- mosaicHeight: alto del mosaico.
-"""
-def identityHomography(img, mosaicWidth, mosaicHeight):
-    tx = mosaicWidth/2 - img.shape[0]/2     # Calculamos traslación en x
-    ty = mosaicHeight/2 - img.shape[1]/2    # Calculamos traslación en y
-    return np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]], dtype=np.float32)
-
-""" Calcula el mosaico resultante de N imágenes.
-- list: Lista de imágenes.
-"""
-def getMosaicN(list):
-    homographies = [None] * len(list)                       # Lista de homografías
-    ind_center = int(len(list)/2)                           # Índice de la imagen central
-    img_center =  list[ind_center]                          # Imagen central
-    width = int(sum([im.shape[1] for im in list]) * 0.9)    # Ancho del mosaico
-    height = list[0].shape[0] * 2                           # Alto del mosaico
-
-    print("El mosaico resultante tiene tamaño ({}, {})".format(width, height))
-
-    # Homografía central
-    hom_center = identityHomography(img_center, width, height)
-    homographies[ind_center] = hom_center
-    res = cv2.warpPerspective(img_center, hom_center, (width, height), borderMode=cv2.BORDER_TRANSPARENT)
-
-    # Empezamos por el centro y vamos hacia atrás
-    for i in range(0, ind_center)[::-1]:
-        h = getHomography(list[i], list[i+1])
-        h = np.dot(homographies[i+1], h)
-        homographies[i] = h
-        res = cv2.warpPerspective(list[i], h, (width, height), dst=res, borderMode=cv2.BORDER_TRANSPARENT)
-
-    # Empezamos por el centro y vamos hacia delante
-    for i in range(ind_center+1, len(list)):
-        h = getHomography(list[i], list[i-1])
-        h = np.dot(homographies[i-1], h)
-        homographies[i] = h
-        res = cv2.warpPerspective(list[i], h, (width, height), dst=res, borderMode=cv2.BORDER_TRANSPARENT)
-
-    return res
-
 ########################
 ###   BURT ADELSON   ###
 ########################
 
 # Funcion que implementa una proyeccion cilindrica sobre una imagen,
 # dada una distancia focal f y un factor de escalado s
-def ProyeccionCilindrica(imagen, f, s):
-    # Si tenemos una imagen en color, separamos en canales RGB y realizamos
-    # el proceso de proyeccion canal a canal
-    if len(imagen.shape) == 3:
-        # Separamos en los distintos canales
-        canales = cv2.split(imagen)
-        canales_proyecciones = []
-        for n in range(len(canales)):
-            # Realizamos cada proyección cilindrica
-            canales_proyecciones.append(ProyeccionCilindrica(canales[n],f,s))
-        # Mezclamos los canales obteniendo las proyeccion para la imagen a color
-        imagen_proyectada=cv2.merge(canales_proyecciones)
+def ProyeccionCilindrica(img, f, s):
+    if len(img.shape) == 3:
+        # Si está en color separamos en los distintos canales
+        canals = cv2.split(img)
+        canals_proy = []
+        for n in range(len(canals)):
+            # Proyección cilindrica
+            canals_proy.append(ProyeccionCilindrica(canals[n],f,s))
+        # Mezclamos canales
+        proyected=cv2.merge(canals_proy)
 
     else:
-        # Creamos una nueva imagen del tamaño de la original
-        imagen_proyectada = np.zeros(imagen.shape)
+        proyected = np.zeros(img.shape)  # Imagen proyectada
 
-        # Recorremos la imagen y vamos aplicando la proyeccion, como sabemos
-        # nuestras coordenadas empiezan en la esquina superior izquierda de
-        # nuestra imagen
-        centro_anchura = imagen.shape[1]/2
-        centro_altura = imagen.shape[0]/2
+        x_center = img.shape[1]/2
+        y_center = img.shape[0]/2
+        # Proyectamos la imagen
+        for i in range(img.shape[0]):
+            for j in range(img.shape[1]):
+                y_proy = floor(s*((i-y_center)/np.sqrt((j-x_center)*(j-x_center)+f*f)) + y_center)
+                x_proy = floor(s*np.arctan((j-x_center)/f) + x_center)
+                proyected[y_proy][x_proy] = img[i][j]
+        # Normalizamos al tipo uint8
+        proyected = cv2.normalize(proyected, proyected, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
 
-        for i in range(imagen.shape[0]):
-            for j in range(imagen.shape[1]):
-                # Sacamos los indices x' e y'
-                i_proyectada = floor(s*((i-centro_altura)/np.sqrt((j-centro_anchura)*(j-centro_anchura)+f*f)) + centro_altura)
-                j_proyectada = floor(s*np.arctan((j-centro_anchura)/f) + centro_anchura)
-                imagen_proyectada[i_proyectada][j_proyectada] = imagen[i][j]
-        # Normalizamos los datos al tipo uint8
-        imagen_proyectada = cv2.normalize(imagen_proyectada,imagen_proyectada,0,255, cv2.NORM_MINMAX,cv2.CV_8U)
-
-    return imagen_proyectada
+    return proyected
 
 def listaProyeccionesCilindricas(list, f, s, title):
     proy = []
@@ -636,39 +586,32 @@ def listaProyeccionesCilindricas(list, f, s, title):
 
 # Funcion que implementa una proyeccion cilindrica sobre una imagen,
 # dada una distancia focal f y un factor de escalado s
-def ProyeccionEsferica(imagen, f, s):
-    # Si tenemos una imagen en color, separamos en canales RGB y realizamos
-    # el proceso de proyeccion canal a canal
-    if len(imagen.shape) == 3:
-        # Separamos en los distintos canales
-        canales = cv2.split(imagen)
-        canales_proyecciones = []
-        for n in range(len(canales)):
-            # Realizamos cada proyección cilindrica
-            canales_proyecciones.append(ProyeccionEsferica(canales[n],f,s))
-        # Mezclamos los canales obteniendo las proyeccion para la imagen a color
-        imagen_proyectada=cv2.merge(canales_proyecciones)
+def ProyeccionEsferica(img, f, s):
+    if len(img.shape) == 3:
+        # Si está en color separamos en los distintos canales
+        canals = cv2.split(img)
+        canals_proy = []
+        for n in range(len(canals)):
+            # Proyección esférica
+            canals_proy.append(ProyeccionEsferica(canals[n],f,s))
+        # Mezclamos canales
+        proyected=cv2.merge(canals_proy)
 
     else:
-        # Creamos una nueva imagen del tamaño de la original
-        imagen_proyectada = np.zeros(imagen.shape)
+        proyected = np.zeros(img.shape)  # Imagen proyectada
 
-        # Recorremos la imagen y vamos aplicando la proyeccion, como sabemos
-        # nuestras coordenadas empiezan en la esquina superior izquierda de
-        # nuestra imagen
-        centro_anchura = imagen.shape[1]/2
-        centro_altura = imagen.shape[0]/2
+        x_center = img.shape[1]/2
+        y_center = img.shape[0]/2
+        # Proyectamos la imagen
+        for i in range(img.shape[0]):
+            for j in range(img.shape[1]):
+                y_proy = floor(s*np.arctan((i-y_center)/np.sqrt((j-x_center)*(j-x_center)+f*f)) + y_center)
+                x_proy = floor(s*np.arctan((j-x_center)/f) + x_center)
+                proyected[y_proy][x_proy] = img[i][j]
+        # Normalizamos al tipo uint8
+        proyected = cv2.normalize(proyected, proyected, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
 
-        for i in range(imagen.shape[0]):
-            for j in range(imagen.shape[1]):
-                # Sacamos los indices x' e y'
-                i_proyectada = floor(s*np.arctan((i-centro_altura)/np.sqrt((j-centro_anchura)*(j-centro_anchura)+f*f)) + centro_altura)
-                j_proyectada = floor(s*np.arctan((j-centro_anchura)/f) + centro_anchura)
-                imagen_proyectada[i_proyectada][j_proyectada] = imagen[i][j]
-        # Normalizamos los datos al tipo uint8
-        imagen_proyectada = cv2.normalize(imagen_proyectada,imagen_proyectada,0,255, cv2.NORM_MINMAX,cv2.CV_8U)
-
-    return imagen_proyectada
+    return proyected
 
 def listaProyeccionesEsfericas(list, f, s, title):
     proy = []
@@ -680,45 +623,40 @@ def listaProyeccionesEsfericas(list, f, s, title):
     return proy
 
 # Funcion que ajusta las imagenes al mismo tamaño y al formato uint32
-def AjustarImagenes(imagen1, imagen2):
+def AjustarImagenes(img1, img2):
     # Obtenemos las dimensiones de las imágenes
-    y1, x1 = imagen1.shape[0:2]
-    y2, x2 = imagen2.shape[0:2]
+    y1, x1 = img1.shape[0:2]
+    y2, x2 = img2.shape[0:2]
 
     # Obtenemos las dimensiones mas pequeñas tanto para la x como para la y
-    nueva_x = min(x1, x2)
-    nueva_y = min(y1, y2)
+    x_min = min(x1, x2)
+    y_min = min(y1, y2)
+
+    # Calculamos la diferencia respecto a las nuevas dimensiones
+    y1_dif = max(y1 - y_min, 0)
+    x1_dif = max(x1 - x_min, 0)
+    y2_dif = max(y2 - y_min, 0)
+    x2_dif = max(x2 - x_min, 0)
+
+    # Obtenemos las nuevas dimensiones (recorte a la imagen de los bordes)
+    y10 = y1_dif // 2 + y1_dif % 2
+    y11 = y1_dif // 2
+    x10 = x1_dif // 2 + x1_dif % 2
+    x11 = x1_dif // 2
+    y20 = y2_dif // 2 + y2_dif % 2
+    y21 = y2_dif // 2
+    x20 = x2_dif // 2 + x2_dif % 2
+    x21 = x2_dif // 2
 
     # Ajustamos ambas imágenes a las mismas dimensiones
-    imagen1, imagen2 = AjustarTamImagenes(imagen1, imagen2, nueva_y, nueva_x)
+    new_img1 = img1[y10:y1 - y11, x10:x1 - x11]
+    new_img2 = img2[y20:y2 - y21, x20:x2 - x21]
 
     # Pasamas al formato correspondiente para operar sobre ellas
-    imagen1 = np.uint32(imagen1)
-    imagen2 = np.uint32(imagen2)
+    new_img1 = np.uint32(new_img1)
+    new_img2 = np.uint32(new_img2)
 
-    return imagen1, imagen2
-
-# Funcion que dadas dos imagenes y dimensiones, las recorta para adecuarlas
-def AjustarTamImagenes(imagen1, imagen2, y_ajuste, x_ajuste):
-    imagenes = [imagen1,imagen2]
-    nuevas_imagenes = []
-    # Recorremos las imágenes
-    for n in range(len(imagenes)):
-        # Obtenemos las dimensiones de la imagen
-        y, x = imagenes[n].shape[0:2]
-        # Calculamos la diferencia respecto a las nuevas dimensiones
-        diferencia_y = max(y - y_ajuste, 0)
-        diferencia_x = max(x - x_ajuste, 0)
-        # Obtenemos las nuevas dimensiones (recorte a la imagen de los bordes)
-        y0 = diferencia_y // 2 + diferencia_y % 2
-        y1 = diferencia_y // 2
-        x0 = diferencia_x // 2 + diferencia_x % 2
-        x1 = diferencia_x // 2
-
-        # Guardamos la nueva imagen
-        nuevas_imagenes.append(imagenes[n][y0:y - y1, x0:x - x1])
-
-    return (nuevas_imagenes[0], nuevas_imagenes[1])
+    return new_img1, new_img2
 
 def Mezcla(Laplaciana1, Laplaciana2):
     Laplaciana_final = []
@@ -734,12 +672,38 @@ def Mezcla(Laplaciana1, Laplaciana2):
         Laplaciana_final.append(nivel)
     return Laplaciana_final
 
-def BurtAdelson(imagen1, imagen2):
+def limpiarImagen(img1, img2):
+    mask = np.zeros((img1.shape[0], img1.shape[1]))
+    mask[np.nonzero(img1)[0:2]] = 1
+    mask[np.nonzero(img2)[0:2]] = 2
+
+    # Si la imagen está a color creamos una copia en B/N
+    if len(mask.shape) == 3:
+        copia_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    else:
+        copia_mask = mask
+
+    # Calculamos las columnas enteras de 0
+    columnas = np.any(copia_mask.T != 0,  axis = 1)
+    # Calculamos las filas enteras de 0
+    filas = np.any(copia_mask.T != 0, axis = 0)
+
+    # Quitamos esas filas y columnas que sobran a la imagen
+    mask = mask[:,columnas][filas,:]
+    img1 = img1[:,columnas][filas,:]
+    img2 = img2[:,columnas][filas,:]
+
+    mask[mask==1]=0
+    mask[mask==2]=1
+
+    return img1, img2
+
+def BurtAdelson(img1, img2):
     # Ajustamos las imágenes a formato uint32 y al mismo tamaño
-    imagen1, imagen2 = AjustarImagenes(imagen1, imagen2)
+    img1, img2 = AjustarImagenes(img1, img2)
     # Calculamos las pirámides Laplacianas
-    laplaciana1 = PiramideLaplaciana(imagen1)
-    laplaciana2 = PiramideLaplaciana(imagen2)
+    laplaciana1 = PiramideLaplaciana(img1)
+    laplaciana2 = PiramideLaplaciana(img2)
 
     # Calculamos la pirámide Laplaciana combinada
     laplaciana_mezcla = Mezcla(laplaciana1, laplaciana2)
@@ -751,59 +715,31 @@ def BurtAdelson(imagen1, imagen2):
     img_restaurada = np.uint8(img_restaurada)
     return img_restaurada
 
-def limpiarImagen(imagen, imagenBA1, imagenBA2):
-    # Si la imagen es a colo creamos una copia en blanco y negro
-    if len(imagen.shape) == 3:
-        copia_imagen = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
-    else:
-        copia_imagen = imagen
+def BurtAdelson(img1, img2):
+    res1, res2 = getMosaic(img1, img2)              # Calulamos el mosaico
+    res1, res2 = limpiarImagen(res1, res2)          # Limpiamos las imágenes
+    res1, res2 = AjustarImagenes(res1, res2)        # Ajustamos imágenes a uint32 y mismo tamaño
+    lap1 = PiramideLaplaciana(res1)                 # Pirámide laplacia 1
+    lap2 = PiramideLaplaciana(res2)                 # Pirámide laplacia 1
+    lap_splined = Mezcla(lap1, lap2)                # Pirámide laplaciana combinada
+    img_splined = RestaurarLaplaciana(lap_splined)  # Restauramos la laplaciana combinada
+    np.clip(img_splined, 0, 255, out=img_splined)   # Normalizamos al rango [0,255]
+    img_splined = np.uint8(img_splined)             # Formato uint8 para visualización
+    return img_splined
 
-    # Calculamos las columnas enteras de 0
-    columnas = np.any(copia_imagen.T != 0,  axis = 1)
-    # Calculamos las filas enteras de 0
-    filas = np.any(copia_imagen.T != 0, axis = 0)
+def BurtAdelson_N(img_list):
+    centro = len(img_list)//2
+    right = BurtAdelson(img_list[centro], img_list[centro+1])
+    left = BurtAdelson(img_list[centro-1], img_list[centro])
 
-    # Quitamos esas filas y columnas que sobran a la imagen
-    imagen = imagen[:,columnas][filas,:]
-    imagenBA1 = imagenBA1[:,columnas][filas,:]
-    imagenBA2 = imagenBA2[:,columnas][filas,:]
-
-    return imagen, imagenBA1, imagenBA2
-
-def mosaicoBA(imagen1, imagen2):
-    area1, area2 = getMosaic(imagen1, imagen2)
-
-    mascaraBA = np.zeros((area1.shape[0], area1.shape[1]))
-    mascaraBA[np.nonzero(area1)[0:2]] = 1
-    mascaraBA[np.nonzero(area2)[0:2]] = 2
-
-    mascaraBA, area1, area2 = limpiarImagen(mascaraBA, area1, area2)
-    mascaraBA[mascaraBA==1]=0
-    mascaraBA[mascaraBA==2]=1
-    # kuek
-    mosaico = BurtAdelson(area1,area2)
-
-    return mosaico
-
-def mosaico_nBA(lista_imagenes):
-    centro = len(lista_imagenes)//2
-    print("centro={}".format(centro))
-    mosaico_der = mosaicoBA(lista_imagenes[centro], lista_imagenes[centro+1])
-    mosaico_izq = mosaicoBA(lista_imagenes[centro-1], lista_imagenes[centro])
-    pintaI(mosaico_der)
-    pintaI(mosaico_izq)
     for n in range(centro, -1, -1):
-        print("Entro izquierda: {}".format(n))
-        mosaico_izq = mosaicoBA(mosaico_izq, lista_imagenes[n])
-        pintaI(mosaico_izq)
-    for n in range(centro, len(lista_imagenes)):
-        print("Entro derecha: {}".format(n))
-        mosaico_der = mosaicoBA(mosaico_der, lista_imagenes[n])
-        pintaI(mosaico_der)
+        left = BurtAdelson(left, img_list[n])
+    for n in range(centro, len(img_list)):
+        right = BurtAdelson(right, img_list[n])
 
-    mosaico_final = mosaicoBA(mosaico_izq, mosaico_der)
+    mosaic = BurtAdelson(left, right)
 
-    return mosaico_final
+    return mosaic
 
 
 #######################
@@ -813,18 +749,18 @@ def mosaico_nBA(lista_imagenes):
 """ Programa principal. """
 if __name__ == "__main__":
     # Leemos las imágenes que necesitamos
-    al1 = leer_imagen("imagenes/al1.png", 1)
-    yos = [leer_imagen("imagenes/yosemite1.jpg", 1),
-           leer_imagen("imagenes/yosemite2.jpg", 1),
-           leer_imagen("imagenes/yosemite3.jpg", 1),
-           leer_imagen("imagenes/yosemite4.jpg", 1)]
-    al = [leer_imagen("imagenes/al1.png", 1),
-          leer_imagen("imagenes/al2.png", 1),
-          leer_imagen("imagenes/al3.png", 1)]
+    al1 =   leer_imagen("imagenes/al1.png", 1)
+    yos =   [leer_imagen("imagenes/yosemite1.jpg", 1),
+             leer_imagen("imagenes/yosemite2.jpg", 1),
+             leer_imagen("imagenes/yosemite3.jpg", 1)]
+    al =    [leer_imagen("imagenes/al1.png", 1),
+             leer_imagen("imagenes/al2.png", 1),
+             leer_imagen("imagenes/al3.png", 1)]
     alham = [leer_imagen("imagenes/alham1.png", 1),
              leer_imagen("imagenes/alham2.png", 1),
              leer_imagen("imagenes/alham3.png", 1),
              leer_imagen("imagenes/alham4.png", 1)]
+    
     #yosProy = listaProyeccionesCilindricas(yos, 800, 800, "Yosemite")
     alProy = listaProyeccionesCilindricas(al, 800, 800, "Alhambra 1")
     #alhamProy = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
@@ -840,19 +776,16 @@ if __name__ == "__main__":
     #input("Pulsa 'Enter' para continuar\n")
 
     # Ejemplo para probar un mosaico de yosemite
-    #yosPan = mosaico_nBA(yosProy)
-    #m1 = mosaicoBA(yosProy[1],yosProy[2])
-    #m2 = mosaicoBA(yosProy[0],m1)
-    #yosPan = mosaicoBA(m2,yosProy[3])
+    #yosPan = BurtAdelson_N(yosProy)
     #pintaI(yosPan, 1, "Mosaico de Yosemite.", "VC Proyecto - BurtAdelson")
     #input("Pulsa 'Enter' para continuar\n")
 
     # Ejemplo para probar un mosaico de la alhambra
-    alPan = mosaico_nBA(alProy)
+    alPan = BurtAdelson_N(alProy)
     pintaI(alPan, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
 
     # Ejemplo para probar un mosaico de la alhambra 2
-    #alhamPan = mosaico_nBA(alhamProy)
+    #alhamPan = BurtAdelson_N(alhamProy)
     #pintaI(alhamPan, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
     """
     pyramid = laplacian_pyramid(al[0], 4)
