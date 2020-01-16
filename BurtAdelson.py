@@ -12,7 +12,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 from math import floor, exp
 from random import sample
-import warnings
 
 ###########################################
 ###   LECTURA E IMPRESIÓN DE IMÁGENES   ###
@@ -87,236 +86,30 @@ def pintaI(image, flag_color=1, image_title = "Imagen", window_title = "Ejercici
 ###   FILTROS Y PIRÁMIDES   ###
 ###############################
 
-""" Aplica una máscara Gaussiana 2D. Devuelve la imagen con las máscara aplicada.
-- image: la imagen a tratar.
-- kernel_x: kernel en las dirección X.
-- kernel_y: kernel en las dirección Y.
-- border_type (op): tipo de bordes. BORDER_DEFAULT.
-"""
-def convolution(image, kernel_x, kernel_y, border_type = cv2.BORDER_DEFAULT):
-    kernel_x = np.transpose(kernel_x)
-    kernel_x = cv2.flip(kernel_x, 0)
-    kernel_y = cv2.flip(kernel_y, 1)
-    im_conv = cv2.filter2D(image, -1, kernel_x, borderType = border_type)
-    im_conv = cv2.filter2D(im_conv, -1, kernel_y, borderType = border_type)
-    return im_conv
-
-""" Aplica una máscara Gaussiana 2D. Devuelve la imagen con las máscara aplicada.
-- image: la imagen a tratar.
-- sigma_x: sigma en la dirección X.
-- sigma_y (op): sigma en la dirección Y. Por defecto sigma_y = sigma_x
-- k_size_x (op): tamaño del kernel en dirección X (positivo e impar). Por defecto es 0, se obtiene a través de sigma.
-- k_size_y (op): tamaño del kernel en dirección Y (positivo e impar). Por defecto es 0, se obtiene a través de sigma.
-- border_type (op): tipo de bordes. BORDER_DEFAULT.
-"""
-def gaussian_blur(image, sigma_x, sigma_y = 0, k_size_x = 0, k_size_y = 0, border_type = cv2.BORDER_DEFAULT):
-    if sigma_y == 0:
-        sigma_y = sigma_x
-    if k_size_x == 0:
-        k_size_x = int(6*sigma_x + 1)
-    if k_size_y == 0:
-        k_size_y = int(6*sigma_y + 1)
-
-    kernel_x = cv2.getGaussianKernel(k_size_x, sigma_x)
-    kernel_y = cv2.getGaussianKernel(k_size_y, sigma_y)
-    return convolution(image, kernel_x, kernel_y, border_type)
-
-""" Aplica máscara laplaciana a imagen. Devuelve la imagen con la máscara aplicada.
-- im: Imagen a la que aplicar la máscara.
-- k_size: Tamaño del kernel para Laplacian.
-- border_type (op): Tipo de borde. Por defecto BORDER_DEFAULT.
-"""
-def laplacian_gaussian(image, k_size, border_type = cv2.BORDER_DEFAULT):
-    k_x1, k_y1 = cv2.getDerivKernels(2, 0, k_size, normalize = True)
-    k_x2, k_y2 = cv2.getDerivKernels(0, 2, k_size, normalize = True)
-    im_convolution_x = convolution(image, k_x1, k_y1, border_type)
-    im_convolution_y = convolution(image, k_x2, k_y2, border_type)
-    return im_convolution_x + im_convolution_y
-
-""" Hace un subsampling de la imagen pasada como argumento. Devuelve la imagen recortada.
-- image: imagen a recortar.
-"""
-def subsampling(image):
-    n_fil = int(image.shape[0]/2)
-    n_col = int(image.shape[1]/2)
-    cp = np.copy(image)
-
-    for a in range(0, n_fil):
-        cp = np.delete(cp, a, axis = 0)
-    for a in range(0, n_col):
-        cp = np.delete(cp, a, axis = 1)
-
-    return cp
-
-""" Hace un upsampling de la imagen pasada como argumento. Devuelve la imagen agrandada.
-- image: imagen a agrandar.
-- n_fil: número de filas de la matriz resultante.
-- n_col: número de columnas de la matriz resultante.
-"""
-def upsampling(image, n_fil, n_col):
-    fil = False
-    col = False
-
-    if n_fil % 2 == 1:
-        n_fil = n_fil-1
-        fil = True
-
-    if n_col % 2 == 1:
-        n_col = n_col-1
-        col = True
-
-    if len(image.shape)==2:
-        if fil and col:
-            salida = np.zeros((n_fil+1, n_col+1))
-        elif fil:
-            salida = np.zeros((n_fil+1, n_col))
-        elif col:
-            salida = np.zeros((n_fil, n_col+1))
-        else:
-            salida = np.zeros((n_fil, n_col))
-
-        # Relleno la matriz, en cada iteración escribo 4 elementos de la matriz de salida
-        for i in range(0, n_fil, 2):
-            for j in range(0, n_col, 2):
-                salida[i][j] = image[int(i/2)][int(j/2)]
-                salida[i+1][j] = image[int(i/2)][int(j/2)]
-                salida[i][j+1] = image[int(i/2)][int(j/2)]
-                salida[i+1][j+1] = image[int(i/2)][int(j/2)]
-
-        # Si el número de filas era impar escribo la última fila la cual borré con n_fil = n_fil-1
-        if fil:
-            for j in range(0, n_col, 2):
-                salida[n_fil][j] = image[image.shape[0]-1][int(j/2)]
-                salida[n_fil][j+1] = image[image.shape[0]-1][int(j/2)]
-
-        # Si el número de columnas era impar escribo la última columna la cual borré con n_col = n_col-1
-        if col:
-            for i in range(0, n_fil, 2):
-                salida[i][n_col] = image[int(i/2)][image.shape[1]-1]
-                salida[i+1][n_col] = image[int(i/2)][image.shape[1]-1]
-
-            # Si se da el caso de que n_fil y n_col eran impares falta el último elemento por escribir en cada banda
-            if fil and col:
-                salida[n_fil][n_col] = image[image.shape[0]-1][image.shape[1]-1]
-
-    if len(image.shape)==3:
-        if fil and col:
-            salida = np.zeros((n_fil+1, n_col+1, image.shape[2]))
-        elif fil:
-            salida = np.zeros((n_fil+1, n_col, image.shape[2]))
-        elif col:
-            salida = np.zeros((n_fil, n_col+1, image.shape[2]))
-        else:
-            salida = np.zeros((n_fil, n_col, image.shape[2]))
-
-        # Escribo en todos los canales
-        for k in range(0, image.shape[2]):
-            # Relleno la matriz, en cada iteración escribo 4 elementos de la matriz de salida
-            for i in range(0, n_fil, 2):
-                for j in range(0, n_col, 2):
-                    salida[i][j][k] = image[int(i/2)][int(j/2)][k]
-                    salida[i+1][j][k] = image[int(i/2)][int(j/2)][k]
-                    salida[i][j+1][k] = image[int(i/2)][int(j/2)][k]
-                    salida[i+1][j+1][k] = image[int(i/2)][int(j/2)][k]
-
-            # Si el número de filas era impar escribo la última fila la cual borré con n_fil = n_fil-1
-            if fil:
-                for k in range(0, image.shape[2]):
-                    #salida[n_fil,:,k][::2] = image[image.shape[0]-1,:,k]
-                    #salida[n_fil,:,k][1::2] = image[image.shape[0]-1,:,k]
-                    for j in range(0, n_col, 2):
-                        salida[n_fil][j][k] = image[image.shape[0]-1][int(j/2)][k]
-                        salida[n_fil][j+1][k] = image[image.shape[0]-1][int(j/2)][k]
-
-            # Si el número de columnas era impar escribo la última columna la cual borré con n_col = n_col-1
-            if col:
-                for k in range(0, image.shape[2]):
-                    #salida[:,n_col,k][::2] = image[:,image.shape[1]-1,k]
-                    #salida[:,n_col,k][1::2] = image[:,image.shape[1]-1,k]
-                    for i in range(0, n_fil, 2):
-                        salida[i][n_col,k] = image[int(i/2)][image.shape[1]-1][k]
-                        salida[i+1][n_col][k] = image[int(i/2)][image.shape[1]-1][k]
-
-                    # Si se da el caso de que n_fil y n_col eran impares falta el último elemento por escribir en cada banda
-                    if fil and col:
-                        salida[n_fil][n_col][k] = image[image.shape[0]-1][image.shape[1]-1][k]
-
-    return salida
-
-""" Genera representación de pirámide gaussiana. Devuelve la lista de imágenes que forman la pirámide gaussiana.
-- image: La imagen a la que generar la pirámide gaussiana.
-- levels (op): Número de niveles de la pirámide gaussiana. Por defecto 4.
-- border_type (op): Tipo de borde a utilizar. Por defecto BORDER DEFAULT.
-"""
-def gaussian_pyramid(image, levels = 4, border_type = cv2.BORDER_DEFAULT):
-    pyramid = [image]
-    blur = np.copy(image)
-    for n in range(levels):
-        blur = gaussian_blur(blur, 1, 1, 7, 7, border_type = border_type)
-        blur = subsampling(blur)
-        pyramid.append(blur)
-    return pyramid
-
-""" Genera representación de pirámide laplaciana. Devuelve la lista de imágenes que forman la pirámide laplaciana.
-- image: La imagen a la que generar la pirámide laplaciana.
-- levels (op): Número de niveles de la pirámide laplaciana. Por defecto 4.
-- border_type (op): Tipo de borde a utilizar. BORDER DEFAULT.
-"""
-def laplacian_pyramid(image, levels = 4, border_type = cv2.BORDER_DEFAULT):
-    gau_pyr = gaussian_pyramid(image, levels+1, border_type)
-    lap_pyr = []
-    for n in range(levels):
-        gau_n_1 = upsampling(gau_pyr[n+1], gau_pyr[n].shape[0], gau_pyr[n].shape[1])
-        #gau_n_1 = 4*gaussian_blur(gau_n_1, 1, 1, 7, 7)   # Otra opción para la laplaciana: poniendo 0s.
-        gau_n_1 = gaussian_blur(gau_n_1, 1, 1, 7, 7, border_type = border_type)
-        lap_pyr.append(normaliza(gau_pyr[n] - gau_n_1, "Etapa {} de la pirámide gaussiana.".format(n)))
-    lap_pyr.append(gau_pyr[levels])
-    return lap_pyr
-
-""" Calcula la máscara gaussiana para un cierto sigma.
-- sigma: desviación típica de la gaussiana.
-"""
-def Gaussiana(sigma):
-    mascara = np.arange(-floor(3*sigma), floor(3*sigma+1))  # intervalo [-3sigma, 3sigma+1]
-
-    vector = []
-    for i in mascara:
-        vector.append([exp(-((i*i) / (2*sigma*sigma)))])
-
-    mascara = np.array(vector)  # Transformamos en array
-    mascara = np.divide(mascara, np.sum(mascara))   # Normalizamos
-    return mascara
-
 """ Sobremuestrea la imagen dada al tamaño de la matriz dado y aplica una máscara.
 - img: imagen a tratar.
 - tam: tamaño.
-- kernel: máscara a usar.
 """
-def convolucionSeparable(img, tam, kernel):
+def convolution(img, tam):
     im_expanded = np.zeros(tam.shape, img.dtype)    # tamaño objetivo
     im_expanded[::2, ::2, ...] = img                # rellenamos en las impares
+    mask = 1.0 / 20 * np.array([1, 5, 8, 5, 1])     # máscara
+    res = im_expanded                                # hago copia
 
-    if kernel:
-        mask = Gaussiana(1)
-    else:
-        mask = 1.0 / 20 * np.array([1, 5, 8, 5, 1])
-
-    cp = im_expanded
-
-    for c in range(2): # Una iteracion para filas, otra para columnas
-        aux = cp.copy() # copia auxiliar
-        for i in range(cp.shape[0]): # Recorro las filas
+    for c in range(2):                  # Itero filas, luego columnas
+        cp = res.copy()                 # copia auxiliar
+        for i in range(res.shape[0]):   # Recorro las filas
             # Aplico el filtro en las filas de la imagen, almacenandolo en la imagen auxiliar
-            aux[i,:] = cv2.filter2D(src=cp[i,:], dst=aux[i,:], ddepth=cv2.CV_32F, kernel=mask, borderType=cv2.BORDER_DEFAULT)
-        cp = cv2.transpose(aux)  # Transpongo y ahora las columnas son filas
+            cp[i,:] = cv2.filter2D(src=res[i,:], dst=cp[i,:], ddepth=cv2.CV_32F, kernel=mask, borderType=cv2.BORDER_DEFAULT)
+        res = cv2.transpose(cp)         # Transpongo y ahora las columnas son filas
 
-    return cp
+    return res
 
 """ Calcula la pirámide gaussiana de una imagen.
 - img: imagen de la que calcular la pirámide.
 - levels (op): niveles de la pirámide. Por defecto 8.
 """
-def PiramideGaussiana(img, levels=8):
+def GaussianPyramid(img, levels=8):
     pyramid = [img] # imagen original
     actual = img
     for i in range(levels):
@@ -332,14 +125,14 @@ def PiramideGaussiana(img, levels=8):
 - levels (op): niveles de la pirámide. Por defecto 8.
 """
 def LaplacianPyramid(img, levels=8):
-    gaussiana = PiramideGaussiana(img, levels)
+    gaussiana = GaussianPyramid(img, levels)
     pyramid = []
     for i in range(len(gaussiana) - 1):
         actual = gaussiana[i]
         siguiente = gaussiana[i+1]
         # Upsampling
         siguiente = np.float32(siguiente)
-        aumento = convolucionSeparable(siguiente, actual, False)
+        aumento = convolution(siguiente, actual)
         siguiente = np.uint32(siguiente)
 
         # Hacemos la diferencia
@@ -363,7 +156,7 @@ def LaplacianRestoring(piramide):
         # Transformamos al formato adecuado para el upsample
         recuperacion = np.float32(recuperacion)
         # Realizamos la convolucion y aumento
-        aumento = convolucionSeparable(recuperacion, siguiente, False)
+        aumento = convolution(recuperacion, siguiente)
         # Recuperamos el formato
         recuperacion = np.uint32(recuperacion)
         # Realizamos la suma y recuperamos la imagen
