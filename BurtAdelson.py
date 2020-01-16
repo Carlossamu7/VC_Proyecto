@@ -12,8 +12,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from math import floor, exp
 from random import sample
-import random
-
+import warnings
 
 ########################################
 ###   FUNCIONES DE OTRAS PRÁCTICAS   ###
@@ -300,7 +299,7 @@ usando "BruteForce+crossCheck". Devuelve la imagen compuesta.
 - flagReturn (op): indica si debemos devolver los keypoints y matches o la imagen.
             Por defecto devolvemos la imagen.
 """
-def getMatches_BFCC(img1, img2, n = 100, flag = 2, flagReturn = 1):
+def getMatches_BFCC(img1, img2, n = 50, flag = 2, flagReturn = 1):
     # Inicializamos el descriptor AKAZE
     detector = cv2.AKAZE_create()
     # Se obtienen los keypoints y los descriptores de las dos imágenes
@@ -308,18 +307,25 @@ def getMatches_BFCC(img1, img2, n = 100, flag = 2, flagReturn = 1):
     keypoints2, descriptor2 = detector.detectAndCompute(img2, None)
 
     # Se crea el objeto BFMatcher activando la validación cruzada
-    bf = cv2.BFMatcher(crossCheck = True)
+    bf = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck = True)
     # Se consiguen los puntos con los que hace match
     matches1to2 = bf.match(descriptor1, descriptor2)
-    # Se ordenan los matches dependiendo de la distancia entre ambos
-    #matches1to2 = sorted(matches1to2, key = lambda x:x.distance)[0:n]
-    # Se guardan n puntos aleatorios
+
+    # Escogemos n elementos aleatorios para mostrarlos
+    #elem_correspondencias = sample(range(len(matches1to2)), n)
+    #best1to2 = []
+    #for i in range(len(elem_correspondencias)):
+    #    best1to2.append(matches1to2[i])
+
     if len(matches1to2)<=n:
-        n = len(matches1to2)-1
-    matches1to2 = random.sample(matches1to2, n)
+        n = len(matches1to2)
+    # Se ordenan los matches dependiendo de la distancia entre ambos
+    matches1to2 = sorted(matches1to2, key = lambda x:x.distance)[0:n]
+    # Se guardan n puntos aleatorios
+    #matches1to2 = sample(matches1to2, n)
 
     # Imagen con los matches
-    img_match = cv2.drawMatches(img1, keypoints1, img2, keypoints2, matches1to2, None, flags = flag)
+    img_match = cv2.drawMatches(img1, keypoints1, img2, keypoints2, matches1to2, outImg=None)
 
     # El usuario nos indica si quiere los keypoints y matches o la imagen
     if flagReturn:
@@ -339,7 +345,7 @@ Si se indica el flag "improve" como True, elegirá los mejores matches.
 - flagReturn (op): indica si debemos devolver los keypoints y matches o la imagen.
             Por defecto devolvemos la imagen.
 """
-def getMatches_LA2NN(img1, img2, n = 100, ratio = 0.8, flag = 2, flagReturn = 1):
+def getMatches_LA2NN(img1, img2, n = 50, ratio = 0.8, flag = 2, flagReturn = 1):
     # Inicializamos el descriptor AKAZE
     detector = cv2.AKAZE_create()
     # Se obtienen los keypoints y los descriptores de las dos imágenes
@@ -347,9 +353,9 @@ def getMatches_LA2NN(img1, img2, n = 100, ratio = 0.8, flag = 2, flagReturn = 1)
     keypoints2, descriptor2 = detector.detectAndCompute(img2, None)
 
     # Se crea el objeto BFMatcher
-    bf = cv2.BFMatcher()
+    bf = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck=False)
     # Escogemos los puntos con los que hace match indicando los vecinos más cercanos para la comprobación (2)
-    matches1to2 = bf.knnMatch(descriptor1, descriptor2, 2)
+    matches1to2 = bf.knnMatch(descriptor1, descriptor2, k=2)
 
     # Mejora de los matches -> los puntos que cumplan con un radio en concreto
     best1to2 = []
@@ -358,21 +364,21 @@ def getMatches_LA2NN(img1, img2, n = 100, ratio = 0.8, flag = 2, flagReturn = 1)
         if p1.distance < ratio * p2.distance:
             best1to2.append([p1])
 
+    if len(best1to2)<=n:
+        n=len(best1to2)
     # Se ordenan los matches dependiendo de la distancia entre ambos
     #matches1to2 = sorted(best1to2, key = lambda x:x[0].distance)[0:n]
     # Se guardan n puntos aleatorios
-    if len(best1to2)<=n:
-        n=len(best1to2)
-    matches1to2 = random.sample(best1to2, n)
+    matches1to2 = sample(best1to2, n)
 
     # Imagen con los matches
-    img_match = cv2.drawMatchesKnn(img1, keypoints1, img2, keypoints2, matches1to2, None, flags = flag)
+    img_match = cv2.drawMatchesKnn(img1, keypoints1, img2, keypoints2, best1to2, outImg=None)
 
     # El usuario nos indica si quiere los keypoints y matches o la imagen
     if flagReturn:
         return img_match
     else:
-        return keypoints1, keypoints2, matches1to2
+        return keypoints1, keypoints2, best1to2
 
 """ Calcula la homografía entre dos imágenes.
 - img1: primera imagen.
@@ -384,11 +390,14 @@ def getHomography(img1, img2, flag=1):
     # Obtenemos los keyPoints y matches entre las dos imagenes.
     if(flag):
         kpts1, kpts2, matches = getMatches_LA2NN(img1, img2, flagReturn=0)
+        # Ordeno los puntos para usar findHomography
+        puntos_origen = np.float32([kpts1[punto[0].queryIdx].pt for punto in matches]).reshape(-1, 1, 2)
+        puntos_destino = np.float32([kpts2[punto[0].trainIdx].pt for punto in matches]).reshape(-1, 1, 2)
     else:
         kpts1, kpts2, matches = getMatches_BFCC(img1, img2, flagReturn=0)
-    # Ordeno los puntos para usar findHomography
-    puntos_origen = np.float32([kpts1[punto[0].queryIdx].pt for punto in matches]).reshape(-1, 1, 2)
-    puntos_destino = np.float32([kpts2[punto[0].trainIdx].pt for punto in matches]).reshape(-1, 1, 2)
+        # Ordeno los puntos para usar findHomography
+        puntos_origen = np.float32([kpts1[punto.queryIdx].pt for punto in matches]).reshape(-1, 1, 2)
+        puntos_destino = np.float32([kpts2[punto.trainIdx].pt for punto in matches]).reshape(-1, 1, 2)
     # Llamamos a findHomography
     homografia , _ = cv2.findHomography(puntos_origen, puntos_destino, cv2.RANSAC, 1)
     return homografia
@@ -397,21 +406,17 @@ def getHomography(img1, img2, flag=1):
 - list: Lista de imágenes.
 """
 def getMosaic(img1, img2):
-    homographies = [None, None]                         # Lista de homografías
-    width = int((img1.shape[1]+img2.shape[1]) * 0.9)    # Ancho del mosaico
-    height = int(img1.shape[0] * 1.4)                   # Alto del mosaico
-
-    print("El mosaico resultante tiene tamaño ({}, {})".format(width, height))
-    tx = 0.09 * width    # Calculo traslación en x
-    ty = 0.09 * height   # Calculo traslación en y
+    width = img1.shape[1] + img2.shape[1]  # Ancho del mosaico
+    height = img1.shape[0]                 # Alto del mosaico
+    #print("El mosaico resultante tiene tamaño ({}, {})".format(width, height))
 
     # Homografía 1
-    hom1 = np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]], dtype=np.float32)
-    res1 = cv2.warpPerspective(img1, hom1, (width, height), borderMode=cv2.BORDER_TRANSPARENT)
+    hom1 = np.matrix([[1,0,0],[0,1,0],[0,0,1]], dtype=float)
+    res1 = cv2.warpPerspective(img1, hom1, (width, height))
     # Homografía 2
-    hom2 = getHomography(img2, img1)
-    hom2 = np.dot(hom1, hom2)
-    res2 = cv2.warpPerspective(img2, hom2, (width, height), borderMode=cv2.BORDER_TRANSPARENT)
+    hom2 = getHomography(img2, img1, 1)
+    hom2 = hom1 * hom2
+    res2 = cv2.warpPerspective(img2, hom1*hom2, (width, height))
 
     return res1, res2
 
@@ -507,7 +512,6 @@ def listaProyeccionesCilindricas(list, f, s, title):
 
     return proy
 
-
 # Funcion que implementa una proyeccion cilindrica sobre una imagen,
 # dada una distancia focal f y un factor de escalado s
 def ProyeccionEsferica(imagen, f, s):
@@ -552,62 +556,6 @@ def listaProyeccionesEsfericas(list, f, s, title):
         proy.append(ProyeccionEsferica(list[i], f, s))
 
     return proy
-
-
-def correspondencias(imagen1, imagen2, criterio, elementos):
-    # Creamos el detector-descriptor SIFT
-    sift = cv2.xfeatures2d.SIFT_create()
-
-    # Obtenemos los keypoints y los descriptores de las dos imagenes
-    keypoints1, descriptores1 = sift.detectAndCompute(imagen1, None)
-    keypoints2, descriptores2 = sift.detectAndCompute(imagen2, None)
-
-    # Si hemos escogido el criterio 1, utilizamos BruteForce+CrossCheck
-    if criterio == 1:
-        # Creamos el objeto BFMatcher con CrossCheck
-        bf = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck=True)
-
-        # Calculamos las correspondencias con los descriptores de las imagenes
-        correspondencias = bf.match(descriptores1, descriptores2)
-
-        # De todas las correspondencias obtenidas, escogemos n elementos
-        # aleatorios para mostrarlos
-        elem_correspondencias = sample(range(len(correspondencias)), elementos)
-
-        seleccionados = []
-        for i in range(len(elem_correspondencias)):
-            seleccionados.append(correspondencias[i])
-
-        # Mostramos los n elementos aleatorios
-        imagen_final = cv2.drawMatches(img1=imagen1, keypoints1=keypoints1,
-                                       img2=imagen2, keypoints2=keypoints2,
-                                       matches1to2=seleccionados, outImg=None)
-
-    # Si hemos escogido el criterio 2, utilizamos Lowe-Average-2NN
-    elif criterio == 2:
-        # Creamos el objeto BFMatcher sin CrossCheck
-        bf = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck=False)
-
-        # Calculamos las correspondencias con los descriptores de las imagenes
-        # y con k=2
-        correspondencias = bf.knnMatch(descriptores1, descriptores2, k=2)
-
-        # De todas las correspondencias obtenidas, escogemos n elementos
-        # aleatorios para mostrarlos
-        elem_correspondencias = sample(range(len(correspondencias)), elementos)
-
-        seleccionados = []
-        for i in elem_correspondencias:
-            seleccionados.append(correspondencias[i])
-
-        # Mostramos los n elementos aleatorios
-        imagen_final = cv2.drawMatchesKnn(img1=imagen1, keypoints1=keypoints1,
-                                          img2=imagen2, keypoints2=keypoints2,
-                                          matches1to2=seleccionados, outImg=None)
-
-    return (correspondencias, keypoints1, keypoints2, imagen_final)
-
-#%%
 
 # Funciones que dado un sigma genera una máscara Gaussiana
 def Mascara_Gaussiana(x,sigma):
@@ -719,7 +667,8 @@ def PiramideGaussiana(imagen, niveles=8):
     return piramide
 
 
-def PiramideLaplaciana(gaussiana):
+def PiramideLaplaciana(imagen, niveles=8):
+    gaussiana = PiramideGaussiana(imagen, niveles)
     piramide = []
     for i in range(len(gaussiana) - 1):
         # Cogemos los operandos
@@ -780,12 +729,9 @@ def Mezcla(Laplaciana1, Laplaciana2):
 def BurtAdelson(imagen1, imagen2):
     # Ajustamos las imágenes a formato uint32 y al mismo tamaño
     imagen1, imagen2 = AjustarImagenes(imagen1, imagen2)
-    # Calculamos las pirámides Gaussianas
-    gaussiana1 = PiramideGaussiana(imagen1)
-    gaussiana2 = PiramideGaussiana(imagen2)
     # Calculamos las pirámides Laplacianas
-    laplaciana1 = PiramideLaplaciana(gaussiana1)
-    laplaciana2 = PiramideLaplaciana(gaussiana2)
+    laplaciana1 = PiramideLaplaciana(imagen1)
+    laplaciana2 = PiramideLaplaciana(imagen2)
 
     # Calculamos la pirámide Laplaciana combinada
     laplaciana_mezcla = Mezcla(laplaciana1, laplaciana2)
@@ -795,11 +741,7 @@ def BurtAdelson(imagen1, imagen2):
     np.clip(img_restaurada, 0, 255, out=img_restaurada)
     # Transformamos el formato de la imagen para la visualización
     img_restaurada = np.uint8(img_restaurada)
-    plt.imsave('orapple.jpg', cv2.cvtColor(img_restaurada, cv2.COLOR_BGR2RGB))
     return img_restaurada
-
-
-#%%
 
 def limpiarImagen(imagen, imagenBA1, imagenBA2):
     # Si la imagen es a colo creamos una copia en blanco y negro
@@ -820,30 +762,23 @@ def limpiarImagen(imagen, imagenBA1, imagenBA2):
 
     return imagen, imagenBA1, imagenBA2
 
+def mosaicoBA_MIO(imagen1, imagen2):
+    res1, res2 = getMosaic(imagen1, imagen2)
 
-def mosaicoBA_antiguo(imagen1, imagen2):
-    # Calculamos la homografía que sítua a la imagen 2 en el centro del canvas
-    homografia=np.matrix([[1,0,0],[0,1,0],[0,0,1]],
-                         dtype=float)
+    mascaraBA = np.zeros((res1.shape[0], res1.shape[1]))
+    mascaraBA[np.nonzero(res1)[0:2]] = 1
+    mascaraBA[np.nonzero(res2)[0:2]] = 2
 
-    # Calculamos las correspondencias y keypoints de la imagen 2 (derecha) a la imagen 1 (izquierda)
-    correspondencias_x, keypoints1, keypoints2 = correspondencias(imagen1, imagen2, 1, 20)[0:3]
+    mascaraBA, res1, res2 = limpiarImagen(mascaraBA, r32es1, res2)
+    mascaraBA[mascaraBA==1]=0
+    mascaraBA[mascaraBA==2]=1
+    # kuek
+    mosaico = BurtAdelson(res1, res2)
 
-    # Obtenemos los puntos de fuente y destino de los objetos DMatch y con un reshape
-    # tal y como se muestra en https://docs.opencv.org/3.3.1/d1/de0/tutorial_py_feature_homography.html
-    puntos_dst = np.float32([keypoints1[m.queryIdx].pt for m in correspondencias_x]).reshape(-1, 1, 2)
-    puntos_src = np.float32([keypoints2[m.trainIdx].pt for m in correspondencias_x]).reshape(-1, 1, 2)
+    return mosaico
 
-    # Calculamos la homografía de la imagen 2 a la imagen 1
-    homografia_x = cv2.findHomography(puntos_src, puntos_dst, cv2.RANSAC, 1)[0]
-
-    # Tamaño del canvas
-    size = (imagen1.shape[1] + imagen2.shape[1], imagen1.shape[0])
-
-    # Aplicamos la homografia que situa a la imagen 2 en el centro del canvas
-    area1 = cv2.warpPerspective(imagen1, homografia, size)
-    # Aplicamos la homografia que situa a la imagen 1 con respecto a la imagen 2
-    area2 = cv2.warpPerspective(imagen2, homografia*homografia_x, dsize=size)
+def mosaicoBA(imagen1, imagen2):
+    area1, area2 = getMosaic(imagen1, imagen2)
 
     mascaraBA = np.zeros((area1.shape[0], area1.shape[1]))
     mascaraBA[np.nonzero(area1)[0:2]] = 1
@@ -857,29 +792,21 @@ def mosaicoBA_antiguo(imagen1, imagen2):
 
     return mosaico
 
-def mosaicoBA(imagen1, imagen2):
-    res1, res2 = getMosaic(imagen1, imagen2)
-
-    mascaraBA = np.zeros((res1.shape[0], res1.shape[1]))
-    #mascaraBA[np.nonzero(res1)[0:2]] = 1
-    #mascaraBA[np.nonzero(res2)[0:2]] = 2
-
-    #mascaraBA, res1, res2 = limpiarImagen(mascaraBA, res1, res2)
-    #mascaraBA[mascaraBA==1]=0
-    #mascaraBA[mascaraBA==2]=1
-    # kuek
-    mosaico = BurtAdelson(res1, res2)
-
-    return mosaico
-
 def mosaico_nBA(lista_imagenes):
     centro = len(lista_imagenes)//2
+    print("centro={}".format(centro))
     mosaico_der = mosaicoBA(lista_imagenes[centro], lista_imagenes[centro+1])
     mosaico_izq = mosaicoBA(lista_imagenes[centro-1], lista_imagenes[centro])
-    for n in range(centro, len(lista_imagenes)):
-        mosaico_der = mosaicoBA(mosaico_der, lista_imagenes[n])
-    for n in range(centro, 0, -1):
+    pintaI(mosaico_der)
+    pintaI(mosaico_izq)
+    for n in range(centro, -1, -1):
+        print("Entro izquierda: {}".format(n))
         mosaico_izq = mosaicoBA(mosaico_izq, lista_imagenes[n])
+        pintaI(mosaico_izq)
+    for n in range(centro, len(lista_imagenes)):
+        print("Entro derecha: {}".format(n))
+        mosaico_der = mosaicoBA(mosaico_der, lista_imagenes[n])
+        pintaI(mosaico_der)
 
     mosaico_final = mosaicoBA(mosaico_izq, mosaico_der)
 
@@ -902,73 +829,6 @@ def limpiarImagen1(imagen):
 
     return imagen
 
-def mosaico_n(imagenes):
-    # Calculamos la posicion de la imagen central
-    centro = len(imagenes)//2
-
-    # Calculamos la homografía que sítua a la imagen central en el centro del canvas
-    homografia=np.matrix([[1,0,imagenes[0].shape[1]*centro],[0,1,imagenes[0].shape[0]*centro],[0,0,1]], dtype=float)
-
-    # Calculamos las homografias hacia la izquierda de la central
-    homografias_izq = []
-    homografia_previa = homografia
-    for i in range(centro, 0, -1):
-        correspondencia, keypoints1, keypoints2 = correspondencias(imagenes[i], imagenes[i-1], 1, 1)[0:3]
-
-        puntos_dst = np.float32([keypoints1[m.queryIdx].pt for m in correspondencia]).reshape(-1, 1, 2)
-        puntos_src = np.float32([keypoints2[m.trainIdx].pt for m in correspondencia]).reshape(-1, 1, 2)
-
-        homografia_i = cv2.findHomography(puntos_src, puntos_dst, cv2.RANSAC, 1)[0]
-
-        homografia_previa = homografia_previa* homografia_i
-        homografias_izq.append(homografia_previa)
-
-    # Calculamos las homografias hacia la derecha de la central
-    homografias_der = []
-    homografia_previa = homografia
-    for i in range(centro, len(imagenes) -1):
-        correspondencia, keypoints1, keypoints2 = correspondencias(imagenes[i], imagenes[i+1], 1, 1)[0:3]
-
-        puntos_dst = np.float32([keypoints1[m.queryIdx].pt for m in correspondencia]).reshape(-1, 1, 2)
-        puntos_src = np.float32([keypoints2[m.trainIdx].pt for m in correspondencia]).reshape(-1, 1, 2)
-
-        homografia_i = cv2.findHomography(puntos_src, puntos_dst, cv2.RANSAC, 1)[0]
-
-        homografia_previa = homografia_previa* homografia_i
-        homografias_der.append(homografia_previa)
-
-    # Tamaño del canvas
-    size_x = 0
-    size_y = 0
-    for i in imagenes:
-        size_x += i.shape[1]
-        size_y += i.shape[0]
-
-    size = (size_x, size_y)
-
-    # Aplicamos la homografia que situa a la imagen 2 en el centro del canvas
-    mosaico = cv2.warpPerspective(imagenes[centro], homografia, size)
-
-    # Aplicamos hacia la izquierda las homografias correspondientes
-    indice_homografia = 0
-    for i in range(centro, 0, -1):
-        mosaico = cv2.warpPerspective(imagenes[i-1], homografias_izq[indice_homografia],
-                                      borderMode=cv2.BORDER_TRANSPARENT, dst=mosaico,
-                                      dsize=size)
-        indice_homografia += 1
-
-    indice_homografia = 0
-    for i in range(centro, len(imagenes) -1):
-        mosaico = cv2.warpPerspective(imagenes[i+1], homografias_der[indice_homografia],
-                                      borderMode=cv2.BORDER_TRANSPARENT, dst=mosaico,
-                                      dsize=size)
-        indice_homografia += 1
-
-    # Quitamos los bordes negros de la imagen
-    mosaico = limpiarImagen1(mosaico)
-
-    return mosaico
-
 #######################
 ###       MAIN      ###
 #######################
@@ -979,18 +839,18 @@ if __name__ == "__main__":
     al1 = leer_imagen("imagenes/al1.png", 1)
     yos = [leer_imagen("imagenes/yosemite1.jpg", 1),
            leer_imagen("imagenes/yosemite2.jpg", 1),
-           leer_imagen("imagenes/yosemite3.jpg", 1)]
+           leer_imagen("imagenes/yosemite3.jpg", 1),
+           leer_imagen("imagenes/yosemite4.jpg", 1)]
     al = [leer_imagen("imagenes/al1.png", 1),
           leer_imagen("imagenes/al2.png", 1),
           leer_imagen("imagenes/al3.png", 1)]
     alham = [leer_imagen("imagenes/alham1.png", 1),
              leer_imagen("imagenes/alham2.png", 1),
              leer_imagen("imagenes/alham3.png", 1),
-             leer_imagen("imagenes/alham4.png", 1),
-             leer_imagen("imagenes/alham5.png", 1)]
-    #yosProy = listaProyeccionesCilindricas(yos, 700, 700, "Yosemite")
-    #alProy = listaProyeccionesCilindricas(al, 700, 700, "Alhambra 1")
-    alhamProy = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
+             leer_imagen("imagenes/alham4.png", 1)]
+    #yosProy = listaProyeccionesCilindricas(yos, 800, 800, "Yosemite")
+    alProy = listaProyeccionesCilindricas(al, 800, 800, "Alhambra 1")
+    #alhamProy = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
 
     # Ejemplo para probar proyecciones cilíndricas
     #proyeccion_cilindrica = ProyeccionCilindrica(al1, 600, 600)
@@ -1004,31 +864,16 @@ if __name__ == "__main__":
 
     # Ejemplo para probar un mosaico de yosemite
     #yosPan = mosaico_nBA(yosProy)
+    #m1 = mosaicoBA(yosProy[1],yosProy[2])
+    #m2 = mosaicoBA(yosProy[0],m1)
+    #yosPan = mosaicoBA(m2,yosProy[3])
     #pintaI(yosPan, 1, "Mosaico de Yosemite.", "VC Proyecto - BurtAdelson")
     #input("Pulsa 'Enter' para continuar\n")
 
     # Ejemplo para probar un mosaico de la alhambra
+    alPan = mosaico_nBA(alProy)
+    pintaI(alPan, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
+
+    # Ejemplo para probar un mosaico de la alhambra 2
     #alhamPan = mosaico_nBA(alhamProy)
-    alhamPan = getMosaicN(alhamProy)
-    pintaI(alhamPan, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
-
-    """ BORRAR CUANDO ESTEMOS SEGUROS
-    # Ejemplo para probar un mosaico de yosemite
-    panorama = mosaico_nBA((ProyeccionCilindrica(cv2.imread("imagenes/yosemite1.jpg", 1), 700, 700),
-                            ProyeccionCilindrica(cv2.imread("imagenes/yosemite2.jpg", 1), 700, 700),
-                            ProyeccionCilindrica(cv2.imread("imagenes/yosemite3.jpg", 1), 700, 700)))
-
-    #pintaI(panorama, 1, "Mosaico de Yosemite.", "VC Proyecto - BurtAdelson")
-    representar("Mosaico de Yosemite", panorama, 1, 1)
-    #input("Pulsa 'Enter' para continuar\n")
-
-    # Ejemplo para probar un mosaico de la playa
-    panorama = mosaico_nBA((ProyeccionCilindrica(cv2.imread("imagenes/alham1.png", 1), 900, 900),
-                            ProyeccionCilindrica(cv2.imread("imagenes/alham2.png", 1), 900, 900),
-                            ProyeccionCilindrica(cv2.imread("imagenes/alham3.png", 1), 900, 900),
-                            ProyeccionCilindrica(cv2.imread("imagenes/alham4.png", 1), 900, 900),
-                            ProyeccionCilindrica(cv2.imread("imagenes/alham5.png", 1), 900, 900)))
-
-    #pintaI(panorama, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
-    representar("Mosaico de la playa de la Herradura", panorama, 1, 1)
-    """
+    #pintaI(alhamPan, 1, "Mosaico de la Alhambra.", "VC Proyecto - BurtAdelson")
