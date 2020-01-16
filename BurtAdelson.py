@@ -273,61 +273,49 @@ def laplacian_pyramid(image, levels = 4, border_type = cv2.BORDER_DEFAULT):
     lap_pyr.append(gau_pyr[levels])
     return lap_pyr
 
-""" Máscara gaussiana.
-- x:
-- sigma:
+""" Calcula la máscara gaussiana para un cierto sigma.
+- sigma: desviación típica de la gaussiana.
 """
-def Mascara_Gaussiana(x, sigma):
-    # Mascara gaussiana
-    return exp(-((x*x)/(2*(sigma*sigma))))
-
 def Gaussiana(sigma):
+    mascara = np.arange(-floor(3*sigma), floor(3*sigma+1))  # intervalo [-3sigma, 3sigma+1]
 
-    # Definimos un array de valores desde -3sigma hasta 3sigma+1
-    mascara = np.arange(-floor(3*sigma), floor(3*sigma+1))
-
-    # Calculamos la funcion para cada valor del vector
     vector = []
     for i in mascara:
-        vector.append([Mascara_Gaussiana(i,sigma)])
+        vector.append([exp(-((i*i) / (2*sigma*sigma)))])
 
-    # Lo transformamos en un array
-    mascara = np.array(vector)
-
-    # Dividimos cada elemento de la mascara por la media de todos ellos
-    mascara = np.divide(mascara, np.sum(mascara))
+    mascara = np.array(vector)  # Transformamos en array
+    mascara = np.divide(mascara, np.sum(mascara))   # Normalizamos
     return mascara
 
-# Función que dada una imagen y una matriz con un tamaño, sobremuestrea la imagen
-# al tamaño de la matriz y aplica una convolución con kernel gaussiano sobre
-# la misma
-def convolucionSeparable(img, tam, kernel_gaussiano):
-    # Aumentamos el tamaño de la imagen al deseado
-    im_expanded = np.zeros(tam.shape, img.dtype)
-    im_expanded[::2, ::2, ...] = img
+""" Sobremuestrea la imagen dada al tamaño de la matriz dado y aplica una máscara.
+- img: imagen a tratar.
+- tam: tamaño.
+- kernel: máscara a usar.
+"""
+def convolucionSeparable(img, tam, kernel):
+    im_expanded = np.zeros(tam.shape, img.dtype)    # tamaño objetivo
+    im_expanded[::2, ::2, ...] = img                # rellenamos en las impares
 
-    # Generamos el kernel a utilizar
-    if kernel_gaussiano:
-        mascara = Gaussiana(1)
+    if kernel:
+        mask = Gaussiana(1)
     else:
-        mascara = 1.0 / 10 * np.array([1, 5, 8, 5, 1])
+        mask = 1.0 / 20 * np.array([1, 5, 8, 5, 1])
 
-    copia = im_expanded # Realizo una copia de la imagen sobre la que trabajare
+    cp = im_expanded
 
     for c in range(2): # Una iteracion para filas, otra para columnas
-        aux = copia.copy() # Realizo una copia auxiliar
-        for i in range(copia.shape[0]): # Recorro las filas
-            # Aplico el filtro en las filas de la imagen, almacenandolo en
-            # la imagen auxiliar, con la mascara calculada anteriormente
-            # y el borde indicado
-            aux[i,:] = cv2.filter2D(src=copia[i,:],dst=aux[i,:],ddepth=cv2.CV_32F,kernel=mascara,borderType=cv2.BORDER_DEFAULT)
-        # Realizo la traspuesta para poder actuar en filas y columnas como si
-        # ambas fueran filas
-        copia = cv2.transpose(aux)
+        aux = cp.copy() # copia auxiliar
+        for i in range(cp.shape[0]): # Recorro las filas
+            # Aplico el filtro en las filas de la imagen, almacenandolo en la imagen auxiliar
+            aux[i,:] = cv2.filter2D(src=cp[i,:], dst=aux[i,:], ddepth=cv2.CV_32F, kernel=mask, borderType=cv2.BORDER_DEFAULT)
+        cp = cv2.transpose(aux)  # Transpongo y ahora las columnas son filas
 
-    return copia
+    return cp
 
-# Funcion que realiza el proceso de pirámide Gaussiana
+""" Calcula la pirámide gaussiana de una imagen.
+- img: imagen de la que calcular la pirámide.
+- levels (op): niveles de la pirámide. Por defecto 8.
+"""
 def PiramideGaussiana(img, levels=8):
     pyramid = [img] # imagen original
     actual = img
@@ -336,12 +324,14 @@ def PiramideGaussiana(img, levels=8):
         # Convolucion + subsampling
         actual = cv2.pyrDown(actual)
         actual = np.uint32(actual)
-        # Guardamos la imagen
         pyramid.append(actual)
     return pyramid
 
-
-def PiramideLaplaciana(img, levels=8):
+""" Calcula la pirámide laplaciana de una imagen.
+- img: imagen de la que calcular la pirámide.
+- levels (op): niveles de la pirámide. Por defecto 8.
+"""
+def LaplacianPyramid(img, levels=8):
     gaussiana = PiramideGaussiana(img, levels)
     pyramid = []
     for i in range(len(gaussiana) - 1):
@@ -357,31 +347,13 @@ def PiramideLaplaciana(img, levels=8):
 
     # Ultimo nivel de la gaussiana que es el primer nivel de la laplaciana
     pyramid.append(gaussiana[-1])
-    #for i in range(len(pyramid)):
-        #pintaI(pyramid[i])
+
     return pyramid
 
-def PiramideLaplaciana_nuevo(img, levels=8):
-    gaussiana = PiramideGaussiana(img, levels)
-    pyramid = []
-    for i in range(len(gaussiana) - 1):
-        actual = gaussiana[i]
-        siguiente = gaussiana[i+1]
-
-        siguiente = np.uint8(siguiente)
-        siguiente = cv2.pyrUp(siguiente, dstsize=(actual.shape[1],actual.shape[0]))
-        siguiente = np.uint32(siguiente)
-
-        # Hacemos la diferencia
-        pyramid.append(actual - siguiente)
-
-    # Ultimo nivel de la gaussiana que es el primer nivel de la laplaciana
-    #pyramid.append(gaussiana[-1])
-    #for i in range(len(pyramid)):
-        #pintaI(pyramid[i])
-    return pyramid
-
-def RestaurarLaplaciana(piramide):
+""" Restaura una pirámide laplaciana.
+- piramide: Pirámide a restaurar.
+"""
+def LaplacianRestoring(piramide):
     # Cogemos el ultimo nivel de la laplaciana
     recuperacion = piramide[-1]
     # Recorremos todos los niveles
@@ -400,7 +372,10 @@ def RestaurarLaplaciana(piramide):
     recuperacion = np.uint32(recuperacion)
     return recuperacion
 
-def RestaurarLaplaciana_nuevo(piramide):
+""" Restaura una pirámide laplaciana.
+- piramide: Pirámide a restaurar.
+"""
+def LaplacianRestoring_nuevo(piramide):
     # Cogemos el ultimo nivel de la laplaciana
     recuperacion = piramide[-1]
     for i in range(len(piramide) - 1):
@@ -445,9 +420,9 @@ def getMatches_BFCC(img1, img2, n = 50, flag = 2, flagReturn = 1):
     if len(matches1to2)<=n:
         n = len(matches1to2)
     # Se ordenan los matches dependiendo de la distancia entre ambos
-    matches1to2 = sorted(matches1to2, key = lambda x:x.distance)[0:n]
+    #matches1to2 = sorted(matches1to2, key = lambda x:x.distance)[0:n]
     # Se guardan n puntos aleatorios
-    #matches1to2 = sample(matches1to2, n)
+    matches1to2 = sample(matches1to2, n)
 
     # Imagen con los matches
     img_match = cv2.drawMatches(img1, keypoints1, img2, keypoints2, matches1to2, outImg=None)
@@ -549,8 +524,11 @@ def getMosaic(img1, img2):
 ###   BURT ADELSON   ###
 ########################
 
-# Funcion que implementa una proyeccion cilindrica sobre una imagen,
-# dada una distancia focal f y un factor de escalado s
+"""  Proyeccion cilindrica de una imagen
+- img: imagen a proyectar.
+- f: distancia focal.
+- s: factor de escalado.
+"""
 def ProyeccionCilindrica(img, f, s):
     if len(img.shape) == 3:
         # Si está en color separamos en los distintos canales
@@ -570,8 +548,8 @@ def ProyeccionCilindrica(img, f, s):
         # Proyectamos la imagen
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
-                y_proy = floor(s*((i-y_center)/np.sqrt((j-x_center)*(j-x_center)+f*f)) + y_center)
-                x_proy = floor(s*np.arctan((j-x_center)/f) + x_center)
+                y_proy = floor(s * ((i-y_center) / np.sqrt((j-x_center)*(j-x_center) + f*f)) + y_center)
+                x_proy = floor(s * np.arctan((j-x_center) / f) + x_center)
                 proyected[y_proy][x_proy] = img[i][j]
         # Normalizamos al tipo uint8
         proyected = cv2.normalize(proyected, proyected, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
@@ -593,8 +571,11 @@ def listaProyeccionesCilindricas(list, f, s, title="Imagen"):
 
     return proy
 
-# Funcion que implementa una proyeccion cilindrica sobre una imagen,
-# dada una distancia focal f y un factor de escalado s
+"""  Proyeccion esférica de una imagen
+- img: imagen a proyectar.
+- f: distancia focal.
+- s: factor de escalado.
+"""
 def ProyeccionEsferica(img, f, s):
     if len(img.shape) == 3:
         # Si está en color separamos en los distintos canales
@@ -614,8 +595,8 @@ def ProyeccionEsferica(img, f, s):
         # Proyectamos la imagen
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
-                y_proy = floor(s*np.arctan((i-y_center)/np.sqrt((j-x_center)*(j-x_center)+f*f)) + y_center)
-                x_proy = floor(s*np.arctan((j-x_center)/f) + x_center)
+                y_proy = floor(s * np.arctan((i-y_center) / np.sqrt((j-x_center)*(j-x_center)+f*f)) + y_center)
+                x_proy = floor(s * np.arctan((j-x_center) / f) + x_center)
                 proyected[y_proy][x_proy] = img[i][j]
         # Normalizamos al tipo uint8
         proyected = cv2.normalize(proyected, proyected, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
@@ -657,14 +638,10 @@ def AjustarImagenes(img1, img2):
     x2_dif = max(x2 - x_min, 0)
 
     # Obtenemos las nuevas dimensiones (recorte a la imagen de los bordes)
-    y10 = y1_dif // 2 + y1_dif % 2
-    y11 = y1_dif // 2
-    x10 = x1_dif // 2 + x1_dif % 2
-    x11 = x1_dif // 2
-    y20 = y2_dif // 2 + y2_dif % 2
-    y21 = y2_dif // 2
-    x20 = x2_dif // 2 + x2_dif % 2
-    x21 = x2_dif // 2
+    y10 = y1_dif // 2 + y1_dif % 2; y11 = y1_dif // 2
+    x10 = x1_dif // 2 + x1_dif % 2; x11 = x1_dif // 2
+    y20 = y2_dif // 2 + y2_dif % 2; y21 = y2_dif // 2
+    x20 = x2_dif // 2 + x2_dif % 2; x21 = x2_dif // 2
 
     # Ajustamos ambas imágenes a las mismas dimensiones
     new_img1 = img1[y10:y1 - y11, x10:x1 - x11]
@@ -681,7 +658,7 @@ de la primera pirámide con la segunda de la segunda imagen.
 - Laplaciana1: primera pirámide a mezclar.
 - Laplaciana2: segunda pirámide a mezclar.
 """
-def Mezcla(Laplaciana1, Laplaciana2):
+def Mix(Laplaciana1, Laplaciana2):
     Laplaciana_final = []
     for i in range(len(Laplaciana1)):
         nivel = np.zeros(Laplaciana1[i].shape, Laplaciana1[i].dtype)
@@ -699,7 +676,7 @@ def Mezcla(Laplaciana1, Laplaciana2):
 - img1: primera imagen a tratar.
 - img2: segunda imagen a tratar.
 """
-def limpiarImagen(img1, img2):
+def cleanImage(img1, img2):
     mask = np.zeros((img1.shape[0], img1.shape[1]))
     mask[np.nonzero(img1)[0:2]] = 1
     mask[np.nonzero(img2)[0:2]] = 2
@@ -728,33 +705,35 @@ def limpiarImagen(img1, img2):
 """ Aplica el algoritmo Burt Adelson a dos imágenes
 - img1: primera imagen a tratar.
 - img2: segunda imagen a tratar.
+- levels (op): niveles de la pirámide laplaciana que se usa en el algoritmo. Por defecto 6.
 """
-def BurtAdelson(img1, img2):
-    res1, res2 = getMosaic(img1, img2)              # Calulamos el mosaico
-    res1, res2 = limpiarImagen(res1, res2)          # Limpiamos las imágenes
-    res1, res2 = AjustarImagenes(res1, res2)        # Ajustamos imágenes a uint32 y mismo tamaño
-    lap1 = PiramideLaplaciana(res1)                 # Pirámide laplacia 1
-    lap2 = PiramideLaplaciana(res2)                 # Pirámide laplacia 1
-    lap_splined = Mezcla(lap1, lap2)                # Pirámide laplaciana combinada
-    img_splined = RestaurarLaplaciana(lap_splined)  # Restauramos la laplaciana combinada
-    np.clip(img_splined, 0, 255, out=img_splined)   # Normalizamos al rango [0,255]
-    img_splined = np.uint8(img_splined)             # Formato uint8 para visualización
+def BurtAdelson(img1, img2, levels=6):
+    res1, res2 = getMosaic(img1, img2)             # Calulamos el mosaico
+    res1, res2 = cleanImage(res1, res2)            # Limpiamos las imágenes
+    res1, res2 = AjustarImagenes(res1, res2)       # Ajustamos imágenes a uint32 y mismo tamaño
+    lap1 = LaplacianPyramid(res1, levels)          # Pirámide laplacia 1
+    lap2 = LaplacianPyramid(res2, levels)          # Pirámide laplacia 1
+    lap_splined = Mix(lap1, lap2)                  # Pirámide laplaciana combinada
+    img_splined = LaplacianRestoring(lap_splined)  # Restauramos la laplaciana combinada
+    np.clip(img_splined, 0, 255, out=img_splined)  # Normalizamos al rango [0,255]
+    img_splined = np.uint8(img_splined)            # Formato uint8 para visualización
     return img_splined
 
 """ Aplica el algoritmo Burt Adelson a dos imágenes
 - img_list: lista de imágenes a tratar.
+- levels (op): niveles de la pirámide laplaciana que se usa en el algoritmo. Por defecto 6.
 """
-def BurtAdelson_N(img_list):
+def BurtAdelson_N(img_list, levels=6):
     centro = len(img_list)//2
-    right = BurtAdelson(img_list[centro], img_list[centro+1])
-    left = BurtAdelson(img_list[centro-1], img_list[centro])
+    right = BurtAdelson(img_list[centro], img_list[centro+1], levels)
+    left = BurtAdelson(img_list[centro-1], img_list[centro], levels)
 
     for n in range(centro, -1, -1):
-        left = BurtAdelson(left, img_list[n])
+        left = BurtAdelson(left, img_list[n], levels)
     for n in range(centro, len(img_list)):
-        right = BurtAdelson(right, img_list[n])
+        right = BurtAdelson(right, img_list[n], levels)
 
-    mosaic = BurtAdelson(left, right)
+    mosaic = BurtAdelson(left, right, levels)
 
     return mosaic
 
@@ -778,6 +757,8 @@ if __name__ == "__main__":
              leer_imagen("imagenes/alham3.png", 1),
              leer_imagen("imagenes/alham4.png", 1)]
 
+    levels = 6      # Niveles para las pirámides en BurtAdelson
+
     #yosProyCil = listaProyeccionesCilindricas(yos, 800, 800, "Yosemite")
     alProyCil = listaProyeccionesCilindricas(al, 800, 800, "Alhambra 1")
     #alhamProyCil = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
@@ -796,27 +777,27 @@ if __name__ == "__main__":
     #input("Pulsa 'Enter' para continuar\n")
 
     # Ejemplo para probar un mosaico de yosemite
-    #yosPanCil = BurtAdelson_N(yosProyCil)
-    #yosPanEsf = BurtAdelson_N(yosProyEsf)
-    #pintaI(yosPanCil, 1, "Mosaico de Yosemite (cilíndrica).", "VC Proyecto - BurtAdelson")
-    #pintaI(yosPanEsf, 1, "Mosaico de Yosemite (esférica).", "VC Proyecto - BurtAdelson")
+    #yosPanCil = BurtAdelson_N(yosProyCil, levels)
+    #yosPanEsf = BurtAdelson_N(yosProyEsf, levels)
+    #pintaI(yosPanCil, 1, "Mosaico de Yosemite (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
+    #pintaI(yosPanEsf, 1, "Mosaico de Yosemite (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
     #input("Pulsa 'Enter' para continuar\n")
 
     # Ejemplo para probar un mosaico de la alhambra
-    alPanCil = BurtAdelson_N(alProyCil)
-    #alPanEsf = BurtAdelson_N(alProyEsf)
-    pintaI(alPanCil, 1, "Mosaico de la Alhambra (cilíndrica).", "VC Proyecto - BurtAdelson")
-    #pintaI(alPanEsf, 1, "Mosaico de la Alhambra (esférica).", "VC Proyecto - BurtAdelson")
+    alPanCil = BurtAdelson_N(alProyCil, levels)
+    #alPanEsf = BurtAdelson_N(alProyEsf, levels)
+    pintaI(alPanCil, 1, "Mosaico de la Alhambra (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
+    #pintaI(alPanEsf, 1, "Mosaico de la Alhambra (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
 
     # Ejemplo para probar un mosaico de la alhambra 2
-    #alhamPanCil = BurtAdelson_N(alhamProyCil)
-    #alhamPanEsf = BurtAdelson_N(alhamProyEsf)
-    #pintaI(alhamPanCil, 1, "Mosaico de la Alhambra (cilíndrica).", "VC Proyecto - BurtAdelson")
-    #pintaI(alhamPanEsf, 1, "Mosaico de la Alhambra (esférica).", "VC Proyecto - BurtAdelson")
+    #alhamPanCil = BurtAdelson_N(alhamProyCil, levels)
+    #alhamPanEsf = BurtAdelson_N(alhamProyEsf, levels)
+    #pintaI(alhamPanCil, 1, "Mosaico de la Alhambra (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
+    #pintaI(alhamPanEsf, 1, "Mosaico de la Alhambra (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
     """
     pyramid = laplacian_pyramid(al[0], 4)
-    res1 = RestaurarLaplaciana_nuevo(pyramid)
+    res1 = LaplacianRestoring_nuevo(pyramid)
     pintaI(res1)
-    res2 = RestaurarLaplaciana(pyramid)
+    res2 = LaplacianRestoring(pyramid)
     pintaI(res2)
     """
