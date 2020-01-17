@@ -79,6 +79,8 @@ def pintaI(image, flag_color=1, image_title = "Imagen", window_title = "Ejercici
     else:
         plt.imshow(image)
     plt.title(image_title)              # Ponemos nombre a la imagen
+    plt.xticks([])                      # Se le pasa una lista de posiciones en las que se deben colocar los
+    plt.yticks([])                      # ticks, si pasamos una lista vacía deshabilitamos los xticks e yticks
     plt.show()
     image = image.astype(np.float64)    # Devolvemos su formato
 
@@ -563,12 +565,14 @@ if __name__ == "__main__":
 
     print("\n----------   PROBANDO PROYECCIONES   ----------")
     # Ejemplo para probar proyecciones cilíndricas
+    print("Proyecciones cilíndricas")
     proy_cilindrica = ProyeccionCilindrica(al[1], 600, 600)
     pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=600. s=600.", "VC Proyecto - BurtAdelson")
     proy_cilindrica = ProyeccionCilindrica(al[1], 800, 800)
     pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=800. s=800.", "VC Proyecto - BurtAdelson")
 
     # Ejemplo para probar proyecciones esféricas
+    print("Proyecciones esféricas")
     proy_esferica = ProyeccionEsferica(al[1], 600, 600)
     pintaI(proy_esferica, 1, "Proyeccion esférica. f=600. s=600.", "VC Proyecto - BurtAdelson")
     proy_esferica = ProyeccionEsferica(al[1], 800, 800)
@@ -577,6 +581,7 @@ if __name__ == "__main__":
     input("Pulsa 'Enter' para continuar\n")
 
     print("\n----------   PROBANDO BURTADELSON   ----------")
+    print("El número de NIVELES de la pirámide para Burt-Adelson es: {}".format(levels))
     # Ejemplo para probar un mosaico de yosemite
     yosPanCil = BurtAdelson_N(yosProyCil, levels, "Yosemite (cilíndrica - {} niveles)".format(levels))
     yosPanEsf = BurtAdelson_N(yosProyEsf, levels, "Yosemite (esférica - {} niveles)".format(levels))
