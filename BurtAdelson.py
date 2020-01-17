@@ -96,7 +96,7 @@ def convolution(img, tam):
     im_expanded = np.zeros(tam.shape, img.dtype)    # tamaño objetivo
     im_expanded[::2, ::2, ...] = img                # rellenamos en las impares
     mask = 1.0 / 20 * np.array([1, 5, 8, 5, 1])     # máscara
-    res = im_expanded                                # hago copia
+    res = im_expanded                               # hago copia
 
     for c in range(2):                  # Itero filas, luego columnas
         cp = res.copy()                 # copia auxiliar
@@ -324,22 +324,21 @@ def getMosaic(img1, img2):
 - f: distancia focal.
 - s: factor de escalado.
 """
-def ProyeccionCilindrica(img, f, s):
+def cylindricalProjection(img, f, s):
     if len(img.shape) == 3:
         # Si está en color separamos en los distintos canales
         canals = cv2.split(img)
         canals_proy = []
         for n in range(len(canals)):
             # Proyección cilindrica
-            canals_proy.append(ProyeccionCilindrica(canals[n],f,s))
+            canals_proy.append(cylindricalProjection(canals[n],f,s))
         # Mezclamos canales
         proyected=cv2.merge(canals_proy)
 
     else:
-        proyected = np.zeros(img.shape)  # Imagen proyectada
-
-        x_center = img.shape[1]/2
-        y_center = img.shape[0]/2
+        proyected = np.zeros(img.shape) # Imagen proyectada
+        y_center = img.shape[0]/2       # centro y
+        x_center = img.shape[1]/2       # centro x
         # Proyectamos la imagen
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
@@ -351,18 +350,49 @@ def ProyeccionCilindrica(img, f, s):
 
     return proyected
 
+"""  Inversa de la proyeccion cilindrica de una imagen
+- img: imagen a proyectar.
+- f: distancia focal.
+- s: factor de escalado.
+"""
+def cylindricalProjectionInverse(img, f, s):
+    if len(img.shape) == 3:
+        # Si está en color separamos en los distintos canales
+        canals = cv2.split(img)
+        canals_proy = []
+        for n in range(len(canals)):
+            # Proyección cilindrica
+            canals_proy.append(cylindricalProjection(canals[n],f,s))
+        # Mezclamos canales
+        proyected=cv2.merge(canals_proy)
+
+    else:
+        proyected = np.zeros(img.shape) # Imagen proyectada
+        y_center = img.shape[0]/2       # centro y
+        x_center = img.shape[1]/2       # centro x
+        # Proyectamos la imagen
+        for y_proy in range(img.shape[0]):
+            for x_proy in range(img.shape[1]):
+                j = floor(np.tan((x_proy - x_center) / s) * f + x_center)
+                i = floor((y_proy - y_center) / s * np.sqrt((j-x_center)*(j-x_center) + f*f) + y_center)
+                proyected[i][j] = img[y_proy][x_proy]
+        # Normalizamos al tipo uint8
+        proyected = cv2.normalize(proyected, proyected, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+
+    return proyected
+
 """ Dada una lista de imágenes devuelve otra con las proyecciones cilíndricas.
 - list: lista de imágenes a proyectar.
 - f: distancia focal.
 - s: factor de escalado.
 - title (op): título. Por defecto "Imagen".
 """
-def listaProyeccionesCilindricas(list, f, s, title="Imagen"):
+def cylindricalProjectionList(list, f, s, title="Imagen"):
     proy = []
 
     print("Calculando las proyecciones cilíndricas de '" + title + "'")
     for i in range(len(list)):
-        proy.append(ProyeccionCilindrica(list[i], f, s))
+        proy.append(cylindricalProjection(list[i], f, s))
 
     return proy
 
@@ -371,22 +401,21 @@ def listaProyeccionesCilindricas(list, f, s, title="Imagen"):
 - f: distancia focal.
 - s: factor de escalado.
 """
-def ProyeccionEsferica(img, f, s):
+def sphericalProjection(img, f, s):
     if len(img.shape) == 3:
         # Si está en color separamos en los distintos canales
         canals = cv2.split(img)
         canals_proy = []
         for n in range(len(canals)):
             # Proyección esférica
-            canals_proy.append(ProyeccionEsferica(canals[n],f,s))
+            canals_proy.append(sphericalProjection(canals[n],f,s))
         # Mezclamos canales
         proyected=cv2.merge(canals_proy)
 
     else:
-        proyected = np.zeros(img.shape)  # Imagen proyectada
-
-        x_center = img.shape[1]/2
-        y_center = img.shape[0]/2
+        proyected = np.zeros(img.shape) # Imagen proyectada
+        y_center = img.shape[0]/2       # centro y
+        x_center = img.shape[1]/2       # centro x
         # Proyectamos la imagen
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
@@ -404,12 +433,12 @@ def ProyeccionEsferica(img, f, s):
 - s: factor de escalado.
 - title (op): título. Por defecto "Imagen".
 """
-def listaProyeccionesEsfericas(list, f, s, title="Imagen"):
+def sphericalProjectionList(list, f, s, title="Imagen"):
     proy = []
 
     print("Calculando las proyecciones esféricas de '" + title + "'")
     for i in range(len(list)):
-        proy.append(ProyeccionEsferica(list[i], f, s))
+        proy.append(sphericalProjection(list[i], f, s))
 
     return proy
 
@@ -417,7 +446,7 @@ def listaProyeccionesEsfericas(list, f, s, title="Imagen"):
 - img1: primera imagen a ajustar.
 - img2: segunda imagen a ajustar.
 """
-def AjustarImagenes(img1, img2):
+def AdjustImages(img1, img2):
     # Obtenemos las dimensiones de las imágenes
     y1, x1 = img1.shape[0:2]
     y2, x2 = img2.shape[0:2]
@@ -427,10 +456,8 @@ def AjustarImagenes(img1, img2):
     y_min = min(y1, y2)
 
     # Calculamos la diferencia respecto a las nuevas dimensiones
-    y1_dif = max(y1 - y_min, 0)
-    x1_dif = max(x1 - x_min, 0)
-    y2_dif = max(y2 - y_min, 0)
-    x2_dif = max(x2 - x_min, 0)
+    y1_dif = max(y1 - y_min, 0); x1_dif = max(x1 - x_min, 0)
+    y2_dif = max(y2 - y_min, 0); x2_dif = max(x2 - x_min, 0)
 
     # Obtenemos las nuevas dimensiones (recorte a la imagen de los bordes)
     y10 = y1_dif // 2 + y1_dif % 2; y11 = y1_dif // 2
@@ -438,11 +465,9 @@ def AjustarImagenes(img1, img2):
     y20 = y2_dif // 2 + y2_dif % 2; y21 = y2_dif // 2
     x20 = x2_dif // 2 + x2_dif % 2; x21 = x2_dif // 2
 
-    # Ajustamos ambas imágenes a las mismas dimensiones
+    # Ajustamos ambas imágenes a las mismas dimensiones y formateamos
     new_img1 = img1[y10:y1 - y11, x10:x1 - x11]
     new_img2 = img2[y20:y2 - y21, x20:x2 - x21]
-
-    # Pasamas al formato correspondiente para operar sobre ellas
     new_img1 = np.uint32(new_img1)
     new_img2 = np.uint32(new_img2)
 
@@ -453,7 +478,7 @@ de la primera pirámide con la segunda de la segunda imagen.
 - Laplaciana1: primera pirámide a mezclar.
 - Laplaciana2: segunda pirámide a mezclar.
 """
-def Mix(Laplaciana1, Laplaciana2):
+def mixLaplacians(Laplaciana1, Laplaciana2):
     Laplaciana_final = []
     for i in range(len(Laplaciana1)):
         nivel = np.zeros(Laplaciana1[i].shape, Laplaciana1[i].dtype)
@@ -482,16 +507,13 @@ def cleanImage(img1, img2):
     else:
         copia_mask = mask
 
-    # Calculamos las columnas enteras de 0
-    columnas = np.any(copia_mask.T != 0,  axis = 1)
-    # Calculamos las filas enteras de 0
-    filas = np.any(copia_mask.T != 0, axis = 0)
+    col = np.any(copia_mask.T != 0,  axis = 1) # columnas de 0s
+    raw = np.any(copia_mask.T != 0, axis = 0)     # filas de 0s
 
-    # Quitamos esas filas y columnas que sobran a la imagen
-    mask = mask[:,columnas][filas,:]
-    img1 = img1[:,columnas][filas,:]
-    img2 = img2[:,columnas][filas,:]
-
+    # Borramos filas y columnas sobrantes
+    mask = mask[:,col][raw,:]
+    img1 = img1[:,col][raw,:]
+    img2 = img2[:,col][raw,:]
     mask[mask==1]=0
     mask[mask==2]=1
 
@@ -505,10 +527,10 @@ def cleanImage(img1, img2):
 def BurtAdelson(img1, img2, levels=6):
     res1, res2 = getMosaic(img1, img2)             # Calulamos el mosaico
     res1, res2 = cleanImage(res1, res2)            # Limpiamos las imágenes
-    res1, res2 = AjustarImagenes(res1, res2)       # Ajustamos imágenes a uint32 y mismo tamaño
+    res1, res2 = AdjustImages(res1, res2)       # Ajustamos imágenes a uint32 y mismo tamaño
     lap1 = LaplacianPyramid(res1, levels)          # Pirámide laplacia 1
     lap2 = LaplacianPyramid(res2, levels)          # Pirámide laplacia 1
-    lap_splined = Mix(lap1, lap2)                  # Pirámide laplaciana combinada
+    lap_splined = mixLaplacians(lap1, lap2)                  # Pirámide laplaciana combinada
     img_splined = LaplacianRestoring(lap_splined)  # Restauramos la laplaciana combinada
     np.clip(img_splined, 0, 255, out=img_splined)  # Normalizamos al rango [0,255]
     img_splined = np.uint8(img_splined)            # Formato uint8 para visualización
@@ -542,7 +564,7 @@ def BurtAdelson_N(img_list, levels=6, title="Imágenes"):
 """ Programa principal. """
 if __name__ == "__main__":
     # Leemos las imágenes que necesitamos
-    al1 =   leer_imagen("imagenes/al1.png", 1)
+    carlosV =   leer_imagen("imagenes/carlosV.jpg", 1)
     yos =   [leer_imagen("imagenes/yosemite1.jpg", 1),
              leer_imagen("imagenes/yosemite2.jpg", 1),
              leer_imagen("imagenes/yosemite3.jpg", 1)]
@@ -556,26 +578,33 @@ if __name__ == "__main__":
 
     levels = 6      # Niveles para las pirámides en BurtAdelson
 
-    yosProyCil = listaProyeccionesCilindricas(yos, 800, 800, "Yosemite")
-    alProyCil = listaProyeccionesCilindricas(al, 800, 800, "Alhambra 1")
-    alhamProyCil = listaProyeccionesCilindricas(alham, 900, 900, "Alhambra 2")
-    yosProyEsf = listaProyeccionesEsfericas(yos, 800, 800, "Yosemite")
-    alProyEsf = listaProyeccionesEsfericas(al, 600, 600, "Alhambra 1")
-    alhamProyEsf = listaProyeccionesEsfericas(alham, 900, 900, "Alhambra 2")
+    yosProyCil = cylindricalProjectionList(yos, 800, 800, "Yosemite")
+    alProyCil = cylindricalProjectionList(al, 800, 800, "Alhambra 1")
+    alhamProyCil = cylindricalProjectionList(alham, 900, 900, "Alhambra 2")
+    yosProyEsf = sphericalProjectionList(yos, 800, 800, "Yosemite")
+    alProyEsf = sphericalProjectionList(al, 600, 600, "Alhambra 1")
+    alhamProyEsf = sphericalProjectionList(alham, 900, 900, "Alhambra 2")
 
     print("\n----------   PROBANDO PROYECCIONES   ----------")
     # Ejemplo para probar proyecciones cilíndricas
+    # Alhambra
     print("Proyecciones cilíndricas")
-    proy_cilindrica = ProyeccionCilindrica(al[1], 600, 600)
+    proy_cilindrica = cylindricalProjection(al[1], 600, 600)
     pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=600. s=600.", "VC Proyecto - BurtAdelson")
-    proy_cilindrica = ProyeccionCilindrica(al[1], 800, 800)
+    proy_cilindrica = cylindricalProjection(al[1], 800, 800)
     pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=800. s=800.", "VC Proyecto - BurtAdelson")
+    # Carlos V
+    print("Proyecciones cilíndricas")
+    proy_cilindrica = cylindricalProjection(carlosV, 600, 600)
+    pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=600. s=600.", "VC Proyecto - BurtAdelson")
+    proy_cilindrica = cylindricalProjection(carlosV, 900, 900)
+    pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=900. s=900.", "VC Proyecto - BurtAdelson")
 
     # Ejemplo para probar proyecciones esféricas
     print("Proyecciones esféricas")
-    proy_esferica = ProyeccionEsferica(al[1], 600, 600)
+    proy_esferica = sphericalProjection(al[1], 600, 600)
     pintaI(proy_esferica, 1, "Proyeccion esférica. f=600. s=600.", "VC Proyecto - BurtAdelson")
-    proy_esferica = ProyeccionEsferica(al[1], 800, 800)
+    proy_esferica = sphericalProjection(al[1], 800, 800)
     pintaI(proy_esferica, 1, "Proyeccion esférica. f=800. s=800.", "VC Proyecto - BurtAdelson")
 
     input("Pulsa 'Enter' para continuar\n")
