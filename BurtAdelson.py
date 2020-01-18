@@ -527,10 +527,10 @@ def cleanImage(img1, img2):
 def BurtAdelson(img1, img2, levels=6):
     res1, res2 = getMosaic(img1, img2)             # Calulamos el mosaico
     res1, res2 = cleanImage(res1, res2)            # Limpiamos las imágenes
-    res1, res2 = AdjustImages(res1, res2)       # Ajustamos imágenes a uint32 y mismo tamaño
+    res1, res2 = AdjustImages(res1, res2)          # Ajustamos imágenes a uint32 y mismo tamaño
     lap1 = LaplacianPyramid(res1, levels)          # Pirámide laplacia 1
     lap2 = LaplacianPyramid(res2, levels)          # Pirámide laplacia 1
-    lap_splined = mixLaplacians(lap1, lap2)                  # Pirámide laplaciana combinada
+    lap_splined = mixLaplacians(lap1, lap2)        # Pirámide laplaciana combinada
     img_splined = LaplacianRestoring(lap_splined)  # Restauramos la laplaciana combinada
     np.clip(img_splined, 0, 255, out=img_splined)  # Normalizamos al rango [0,255]
     img_splined = np.uint8(img_splined)            # Formato uint8 para visualización
