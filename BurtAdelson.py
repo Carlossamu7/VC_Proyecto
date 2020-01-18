@@ -563,6 +563,7 @@ def BurtAdelson_N(img_list, levels=6, title="Imágenes"):
 
 """ Programa principal. """
 if __name__ == "__main__":
+    print("\n----------   PREPROCESADO IMÁGENES   ----------")
     # Leemos las imágenes que necesitamos
     carlosV =   leer_imagen("imagenes/carlosV.jpg", 1)
     yos =   [leer_imagen("imagenes/yosemite1.jpg", 1),
@@ -580,21 +581,20 @@ if __name__ == "__main__":
 
     yosProyCil = cylindricalProjectionList(yos, 800, 800, "Yosemite")
     alProyCil = cylindricalProjectionList(al, 800, 800, "Alhambra 1")
-    alhamProyCil = cylindricalProjectionList(alham, 900, 900, "Alhambra 2")
+    #alhamProyCil = cylindricalProjectionList(alham, 900, 900, "Alhambra 2")
     yosProyEsf = sphericalProjectionList(yos, 800, 800, "Yosemite")
     alProyEsf = sphericalProjectionList(al, 600, 600, "Alhambra 1")
-    alhamProyEsf = sphericalProjectionList(alham, 900, 900, "Alhambra 2")
+    #alhamProyEsf = sphericalProjectionList(alham, 900, 900, "Alhambra 2")
 
     print("\n----------   PROBANDO PROYECCIONES   ----------")
     # Ejemplo para probar proyecciones cilíndricas
-    # Alhambra
     print("Proyecciones cilíndricas")
+    # Alhambra
     proy_cilindrica = cylindricalProjection(al[1], 600, 600)
     pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=600. s=600.", "VC Proyecto - BurtAdelson")
     proy_cilindrica = cylindricalProjection(al[1], 800, 800)
     pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=800. s=800.", "VC Proyecto - BurtAdelson")
     # Carlos V
-    print("Proyecciones cilíndricas")
     proy_cilindrica = cylindricalProjection(carlosV, 600, 600)
     pintaI(proy_cilindrica, 1, "Proyeccion cilindrica. f=600. s=600.", "VC Proyecto - BurtAdelson")
     proy_cilindrica = cylindricalProjection(carlosV, 900, 900)
@@ -602,10 +602,16 @@ if __name__ == "__main__":
 
     # Ejemplo para probar proyecciones esféricas
     print("Proyecciones esféricas")
+    # Alhambra
     proy_esferica = sphericalProjection(al[1], 600, 600)
     pintaI(proy_esferica, 1, "Proyeccion esférica. f=600. s=600.", "VC Proyecto - BurtAdelson")
     proy_esferica = sphericalProjection(al[1], 800, 800)
     pintaI(proy_esferica, 1, "Proyeccion esférica. f=800. s=800.", "VC Proyecto - BurtAdelson")
+    # Carlos V
+    proy_esferica = sphericalProjection(carlosV, 600, 600)
+    pintaI(proy_esferica, 1, "Proyeccion esférica. f=600. s=600.", "VC Proyecto - BurtAdelson")
+    proy_esferica = sphericalProjection(carlosV, 900, 900)
+    pintaI(proy_esferica, 1, "Proyeccion esférica. f=900. s=900.", "VC Proyecto - BurtAdelson")
 
     input("Pulsa 'Enter' para continuar\n")
 
