@@ -146,15 +146,15 @@ def LaplacianPyramid(img, levels=8):
     return pyramid
 
 """ Restaura una pirámide laplaciana.
-- piramide: Pirámide a restaurar.
+- pyramid: Pirámide a restaurar.
 """
-def LaplacianRestoring(piramide):
+def LaplacianRestoring(pyramid):
     # Cogemos el ultimo nivel de la laplaciana
-    recuperacion = piramide[-1]
+    recuperacion = pyramid[-1]
     # Recorremos todos los niveles
-    for i in range(len(piramide) - 1):
+    for i in range(len(pyramid) - 1):
         # Cogemos el siguiente
-        siguiente = piramide[-2 - i]
+        siguiente = pyramid[-2 - i]
         # Transformamos al formato adecuado para el upsample
         recuperacion = np.float32(recuperacion)
         # Realizamos la convolucion y aumento
@@ -167,19 +167,6 @@ def LaplacianRestoring(piramide):
     recuperacion = np.uint32(recuperacion)
     return recuperacion
 
-""" Restaura una pirámide laplaciana.
-- piramide: Pirámide a restaurar.
-"""
-def LaplacianRestoring_nuevo(piramide):
-    # Cogemos el ultimo nivel de la laplaciana
-    recuperacion = piramide[-1]
-    for i in range(len(piramide) - 1):
-        siguiente = piramide[-2 - i]
-        # Realizamos la convolucion y aumento
-        aumento = cv2.pyrUp(recuperacion, dstsize=(siguiente.shape[1],siguiente.shape[0]))
-        recuperacion = aumento + siguiente
-    return recuperacion
-
 ####################################
 ###   CONSTRUCCIÓN DE MOSAICOS   ###
 ####################################
@@ -188,7 +175,7 @@ def LaplacianRestoring_nuevo(piramide):
 usando "BruteForce+crossCheck". Devuelve la imagen compuesta.
 - img1: Primera imagen para el match.
 - img2: Segunda imagen para el match.
-- n (op): número de matches a mostrar. Por defecto 100.
+- n (op): número de matches a mostrar. Por defecto 50.
 - flag (op): indica si se muestran los keypoints y los matches (0) o solo los matches (2).
             Por defecto 2.
 - flagReturn (op): indica si debemos devolver los keypoints y matches o la imagen.
@@ -205,12 +192,6 @@ def getMatches_BFCC(img1, img2, n = 50, flag = 2, flagReturn = 1):
     bf = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck = True)
     # Se consiguen los puntos con los que hace match
     matches1to2 = bf.match(descriptor1, descriptor2)
-
-    # Escogemos n elementos aleatorios para mostrarlos
-    #elem_correspondencias = sample(range(len(matches1to2)), n)
-    #best1to2 = []
-    #for i in range(len(elem_correspondencias)):
-    #    best1to2.append(matches1to2[i])
 
     if len(matches1to2)<=n:
         n = len(matches1to2)
@@ -233,7 +214,7 @@ usando "Lowe-Average-2NN". Devuelve la imagen compuesta.
 Si se indica el flag "improve" como True, elegirá los mejores matches.
 - img1: Primera imagen para el match.
 - img2: Segunda imagen para el match.
-- n (op): número de matches a mostrar. Por defecto 100.
+- n (op): número de matches a mostrar. Por defecto 50.
 - ratio (op): Radio para la distancia entre puntos. Por defecto 0.8.
 - flag (op): indica si se muestran los keypoints y los matches (0) o solo los matches (2).
             Por defecto 2.
@@ -507,8 +488,8 @@ def cleanImage(img1, img2):
     else:
         copia_mask = mask
 
-    col = np.any(copia_mask.T != 0,  axis = 1) # columnas de 0s
-    raw = np.any(copia_mask.T != 0, axis = 0)     # filas de 0s
+    col = np.any(copia_mask.T != 0,  axis = 1)  # columnas de 0s
+    raw = np.any(copia_mask.T != 0, axis = 0)   # filas de 0s
 
     # Borramos filas y columnas sobrantes
     mask = mask[:,col][raw,:]
