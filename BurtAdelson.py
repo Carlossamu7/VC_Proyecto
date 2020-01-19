@@ -111,7 +111,7 @@ def convolution(img, tam):
 - img: imagen de la que calcular la pirámide.
 - levels (op): niveles de la pirámide. Por defecto 8.
 """
-def GaussianPyramid(img, levels=8):
+def gaussianPyramid(img, levels=8):
     pyramid = [img] # imagen original
     actual = img
     for i in range(levels):
@@ -126,8 +126,8 @@ def GaussianPyramid(img, levels=8):
 - img: imagen de la que calcular la pirámide.
 - levels (op): niveles de la pirámide. Por defecto 8.
 """
-def LaplacianPyramid(img, levels=8):
-    gaussiana = GaussianPyramid(img, levels)
+def laplacianPyramid(img, levels=8):
+    gaussiana = gaussianPyramid(img, levels)
     pyramid = []
     for i in range(len(gaussiana) - 1):
         actual = gaussiana[i]
@@ -148,7 +148,7 @@ def LaplacianPyramid(img, levels=8):
 """ Restaura una pirámide laplaciana.
 - pyramid: Pirámide a restaurar.
 """
-def LaplacianRestoring(pyramid):
+def laplacianRestoring(pyramid):
     # Cogemos el ultimo nivel de la laplaciana
     recuperacion = pyramid[-1]
     # Recorremos todos los niveles
@@ -278,7 +278,7 @@ def getHomography(img1, img2, flag=1):
     homografia , _ = cv2.findHomography(puntos_origen, puntos_destino, cv2.RANSAC, 1)
     return homografia
 
-""" Calcula el mosaico resultante de N imágenes.
+""" Calcula el mosaico resultante de 2 imágenes.
 - list: Lista de imágenes.
 """
 def getMosaic(img1, img2):
@@ -427,7 +427,7 @@ def sphericalProjectionList(list, f, s, title="Imagen"):
 - img1: primera imagen a ajustar.
 - img2: segunda imagen a ajustar.
 """
-def AdjustImages(img1, img2):
+def adjustImages(img1, img2):
     # Obtenemos las dimensiones de las imágenes
     y1, x1 = img1.shape[0:2]
     y2, x2 = img2.shape[0:2]
@@ -508,11 +508,11 @@ def cleanImage(img1, img2):
 def BurtAdelson(img1, img2, levels=6):
     res1, res2 = getMosaic(img1, img2)             # Calulamos el mosaico
     res1, res2 = cleanImage(res1, res2)            # Limpiamos las imágenes
-    res1, res2 = AdjustImages(res1, res2)          # Ajustamos imágenes a uint32 y mismo tamaño
-    lap1 = LaplacianPyramid(res1, levels)          # Pirámide laplacia 1
-    lap2 = LaplacianPyramid(res2, levels)          # Pirámide laplacia 1
+    res1, res2 = adjustImages(res1, res2)          # Ajustamos imágenes a uint32 y mismo tamaño
+    lap1 = laplacianPyramid(res1, levels)          # Pirámide laplacia 1
+    lap2 = laplacianPyramid(res2, levels)          # Pirámide laplacia 1
     lap_splined = mixLaplacians(lap1, lap2)        # Pirámide laplaciana combinada
-    img_splined = LaplacianRestoring(lap_splined)  # Restauramos la laplaciana combinada
+    img_splined = laplacianRestoring(lap_splined)  # Restauramos la laplaciana combinada
     np.clip(img_splined, 0, 255, out=img_splined)  # Normalizamos al rango [0,255]
     img_splined = np.uint8(img_splined)            # Formato uint8 para visualización
     return img_splined
@@ -523,7 +523,7 @@ def BurtAdelson(img1, img2, levels=6):
 - title (op): título del conjunto de imágenes.
 """
 def BurtAdelson_N(img_list, levels=6, title="Imágenes"):
-    print("BurtAdelson al conjunto de imágenes " + title)
+    print("BurtAdelson al conjunto de imágenes '" + title + "'")
     centro = len(img_list)//2
     right = BurtAdelson(img_list[centro], img_list[centro+1], levels)
     left = BurtAdelson(img_list[centro-1], img_list[centro], levels)
@@ -544,7 +544,7 @@ def BurtAdelson_N(img_list, levels=6, title="Imágenes"):
 
 """ Programa principal. """
 if __name__ == "__main__":
-    print("\n----------   PREPROCESADO IMÁGENES   ----------")
+    print("\n----------   PREPROCESANDO IMÁGENES   ----------")
     # Leemos las imágenes que necesitamos
     carlosV =   leer_imagen("imagenes/carlosV.jpg", 1)
     yos =   [leer_imagen("imagenes/yosemite1.jpg", 1),
