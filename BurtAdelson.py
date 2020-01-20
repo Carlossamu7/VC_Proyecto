@@ -145,28 +145,6 @@ def laplacianPyramid(img, levels=8):
 
     return pyramid
 
-""" Restaura una pirámide laplaciana.
-- pyramid: Pirámide a restaurar.
-"""
-def laplacianRestoring(pyramid):
-    # Cogemos el ultimo nivel de la laplaciana
-    recuperacion = pyramid[-1]
-    # Recorremos todos los niveles
-    for i in range(len(pyramid) - 1):
-        # Cogemos el siguiente
-        siguiente = pyramid[-2 - i]
-        # Transformamos al formato adecuado para el upsample
-        recuperacion = np.float32(recuperacion)
-        # Realizamos la convolucion y aumento
-        aumento = convolution(recuperacion, siguiente)
-        # Recuperamos el formato
-        recuperacion = np.uint32(recuperacion)
-        # Realizamos la suma y recuperamos la imagen
-        recuperacion = aumento + siguiente
-    # Guardamos la imagen en el formato uint32
-    recuperacion = np.uint32(recuperacion)
-    return recuperacion
-
 ####################################
 ###   CONSTRUCCIÓN DE MOSAICOS   ###
 ####################################
@@ -423,6 +401,33 @@ def sphericalProjectionList(list, f, s, title="Imagen"):
 
     return proy
 
+""" Limpia el área que no está en ninguna imagen.
+- img1: primera imagen a tratar.
+- img2: segunda imagen a tratar.
+"""
+def cleanImage(img1, img2):
+    mask = np.zeros((img1.shape[0], img1.shape[1]))
+    mask[np.nonzero(img1)[0:2]] = 1
+    mask[np.nonzero(img2)[0:2]] = 2
+
+    # Si la imagen está a color creamos una copia en B/N
+    if len(mask.shape) == 3:
+        copia_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    else:
+        copia_mask = mask
+
+    col = np.any(copia_mask.T != 0,  axis = 1)  # columnas de 0s
+    raw = np.any(copia_mask.T != 0, axis = 0)   # filas de 0s
+
+    # Borramos filas y columnas sobrantes
+    mask = mask[:,col][raw,:]
+    img1 = img1[:,col][raw,:]
+    img2 = img2[:,col][raw,:]
+    mask[mask==1]=0
+    mask[mask==2]=1
+
+    return img1, img2
+
 """ Ajusta las imagenes al mismo tamaño (devuelve formato uint32).
 - img1: primera imagen a ajustar.
 - img2: segunda imagen a ajustar.
@@ -456,51 +461,46 @@ def adjustImages(img1, img2):
 
 """ Para cada nivel de la Laplaciana mezcla la primera mitad de la imagen
 de la primera pirámide con la segunda de la segunda imagen.
-- Laplaciana1: primera pirámide a mezclar.
-- Laplaciana2: segunda pirámide a mezclar.
+- laplaciana1: primera pirámide a mezclar.
+- laplaciana1: segunda pirámide a mezclar.
 """
-def mixLaplacians(Laplaciana1, Laplaciana2):
-    Laplaciana_final = []
-    for i in range(len(Laplaciana1)):
-        nivel = np.zeros(Laplaciana1[i].shape, Laplaciana1[i].dtype)
-        mitad = Laplaciana1[i].shape[1] // 2
-        nivel[:, :mitad, ...] = Laplaciana1[i][:, :mitad, ...]
-        nivel[:, -mitad:, ...] = Laplaciana2[i][:, -mitad:, ...]
-        if Laplaciana1[i].shape[1] % 2 == 1:
+def mixLaplacians(laplaciana1, laplaciana1):
+    finalLaplacian = []
+    for i in range(len(laplaciana1)):
+        aux = np.zeros(laplaciana1[i].shape, laplaciana1[i].dtype)
+        mitad = laplaciana1[i].shape[1] // 2
+        aux[:, :mitad, ...] = laplaciana1[i][:, :mitad, ...]
+        aux[:, -mitad:, ...] = laplaciana1[i][:, -mitad:, ...]
+        if laplaciana1[i].shape[1] % 2 == 1:
             # Numero de columnas impar -> media aritmética
-            nivel[:, mitad, ...] = (Laplaciana1[i][:, mitad, ...] + Laplaciana2[i][:, mitad, ...])/2
+            aux[:, mitad, ...] = (laplaciana1[i][:, mitad, ...] + laplaciana1[i][:, mitad, ...])/2
 
-        Laplaciana_final.append(nivel)
-    return Laplaciana_final
+        finalLaplacian.append(aux)
+    return finalLaplacian
 
-""" Limpia el área que no está en ninguna imagen.
-- img1: primera imagen a tratar.
-- img2: segunda imagen a tratar.
+""" Restaura una pirámide laplaciana.
+- pyramid: Pirámide a restaurar.
 """
-def cleanImage(img1, img2):
-    mask = np.zeros((img1.shape[0], img1.shape[1]))
-    mask[np.nonzero(img1)[0:2]] = 1
-    mask[np.nonzero(img2)[0:2]] = 2
+def laplacianRestoring(pyramid):
+    # Cogemos el ultimo nivel de la laplaciana
+    recuperacion = pyramid[-1]
+    # Recorremos todos los niveles
+    for i in range(len(pyramid) - 1):
+        # Cogemos el siguiente
+        siguiente = pyramid[-2 - i]
+        # Transformamos al formato adecuado para el upsample
+        recuperacion = np.float32(recuperacion)
+        # Realizamos la convolucion y aumento
+        aumento = convolution(recuperacion, siguiente)
+        # Recuperamos el formato
+        recuperacion = np.uint32(recuperacion)
+        # Realizamos la suma y recuperamos la imagen
+        recuperacion = aumento + siguiente
+    # Guardamos la imagen en el formato uint32
+    recuperacion = np.uint32(recuperacion)
+    return recuperacion
 
-    # Si la imagen está a color creamos una copia en B/N
-    if len(mask.shape) == 3:
-        copia_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-    else:
-        copia_mask = mask
-
-    col = np.any(copia_mask.T != 0,  axis = 1)  # columnas de 0s
-    raw = np.any(copia_mask.T != 0, axis = 0)   # filas de 0s
-
-    # Borramos filas y columnas sobrantes
-    mask = mask[:,col][raw,:]
-    img1 = img1[:,col][raw,:]
-    img2 = img2[:,col][raw,:]
-    mask[mask==1]=0
-    mask[mask==2]=1
-
-    return img1, img2
-
-""" Aplica el algoritmo Burt Adelson a dos imágenes
+""" Aplica el algoritmo Burt Adelson a dos imágenes.
 - img1: primera imagen a tratar.
 - img2: segunda imagen a tratar.
 - levels (op): niveles de la pirámide laplaciana que se usa en el algoritmo. Por defecto 6.
@@ -517,7 +517,7 @@ def BurtAdelson(img1, img2, levels=6):
     img_splined = np.uint8(img_splined)            # Formato uint8 para visualización
     return img_splined
 
-""" Aplica el algoritmo Burt Adelson a dos imágenes
+""" Aplica el algoritmo Burt Adelson a N imágenes.
 - img_list: lista de imágenes a tratar.
 - levels (op): niveles de la pirámide laplaciana que se usa en el algoritmo. Por defecto 6.
 - title (op): título del conjunto de imágenes.
@@ -553,10 +553,10 @@ if __name__ == "__main__":
     al =    [leer_imagen("imagenes/al1.png", 1),
              leer_imagen("imagenes/al2.png", 1),
              leer_imagen("imagenes/al3.png", 1)]
-    alham = [leer_imagen("imagenes/alham1.png", 1),
-             leer_imagen("imagenes/alham2.png", 1),
-             leer_imagen("imagenes/alham3.png", 1),
-             leer_imagen("imagenes/alham4.png", 1)]
+    #alham = [leer_imagen("imagenes/alham1.png", 1),
+    #         leer_imagen("imagenes/alham2.png", 1),
+    #         leer_imagen("imagenes/alham3.png", 1),
+    #         leer_imagen("imagenes/alham4.png", 1)]
 
     levels = 6      # Niveles para las pirámides en BurtAdelson
 
