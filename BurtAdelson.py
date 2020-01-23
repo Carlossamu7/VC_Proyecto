@@ -462,18 +462,18 @@ def adjustImages(img1, img2):
 """ Para cada nivel de la Laplaciana mezcla la primera mitad de la imagen
 de la primera pirámide con la segunda de la segunda imagen.
 - laplaciana1: primera pirámide a mezclar.
-- laplaciana1: segunda pirámide a mezclar.
+- laplaciana2: segunda pirámide a mezclar.
 """
-def mixLaplacians(laplaciana1, laplaciana1):
+def mixLaplacians(laplaciana1, laplaciana2):
     finalLaplacian = []
     for i in range(len(laplaciana1)):
         aux = np.zeros(laplaciana1[i].shape, laplaciana1[i].dtype)
         mitad = laplaciana1[i].shape[1] // 2
         aux[:, :mitad, ...] = laplaciana1[i][:, :mitad, ...]
-        aux[:, -mitad:, ...] = laplaciana1[i][:, -mitad:, ...]
+        aux[:, -mitad:, ...] = laplaciana2[i][:, -mitad:, ...]
         if laplaciana1[i].shape[1] % 2 == 1:
             # Numero de columnas impar -> media aritmética
-            aux[:, mitad, ...] = (laplaciana1[i][:, mitad, ...] + laplaciana1[i][:, mitad, ...])/2
+            aux[:, mitad, ...] = (laplaciana1[i][:, mitad, ...] + laplaciana2[i][:, mitad, ...])/2
 
         finalLaplacian.append(aux)
     return finalLaplacian
@@ -553,19 +553,13 @@ if __name__ == "__main__":
     al =    [leer_imagen("imagenes/al1.png", 1),
              leer_imagen("imagenes/al2.png", 1),
              leer_imagen("imagenes/al3.png", 1)]
-    #alham = [leer_imagen("imagenes/alham1.png", 1),
-    #         leer_imagen("imagenes/alham2.png", 1),
-    #         leer_imagen("imagenes/alham3.png", 1),
-    #         leer_imagen("imagenes/alham4.png", 1)]
 
     levels = 6      # Niveles para las pirámides en BurtAdelson
 
     yosProyCil = cylindricalProjectionList(yos, 800, 800, "Yosemite")
-    alProyCil = cylindricalProjectionList(al, 800, 800, "Alhambra 1")
-    #alhamProyCil = cylindricalProjectionList(alham, 900, 900, "Alhambra 2")
+    alProyCil = cylindricalProjectionList(al, 800, 800, "Alhambra")
     yosProyEsf = sphericalProjectionList(yos, 800, 800, "Yosemite")
-    alProyEsf = sphericalProjectionList(al, 600, 600, "Alhambra 1")
-    #alhamProyEsf = sphericalProjectionList(alham, 900, 900, "Alhambra 2")
+    alProyEsf = sphericalProjectionList(al, 600, 600, "Alhambra")
 
     print("\n----------   PROBANDO PROYECCIONES   ----------")
     # Ejemplo para probar proyecciones cilíndricas
@@ -609,11 +603,5 @@ if __name__ == "__main__":
     alPanEsf = BurtAdelson_N(alProyEsf, levels, "Alhambra (esférica - {} niveles)".format(levels))
     pintaI(alPanCil, 1, "Mosaico de la Alhambra (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
     pintaI(alPanEsf, 1, "Mosaico de la Alhambra (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
-
-    # Ejemplo para probar un mosaico de la alhambra 2
-    #alhamPanCil = BurtAdelson_N(alhamProyCil, levels, "Alhambra (cilíndrica - {} niveles)".format(levels))
-    #alhamPanEsf = BurtAdelson_N(alhamProyEsf, levels, "Alhambra (esférica - {} niveles)".format(levels))
-    #pintaI(alhamPanCil, 1, "Mosaico de la Alhambra (cilíndrica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
-    #pintaI(alhamPanEsf, 1, "Mosaico de la Alhambra (esférica - {} niveles).".format(levels), "VC Proyecto - BurtAdelson")
 
     input("Pulsa 'Enter' para continuar\n")
